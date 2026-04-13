@@ -7,7 +7,7 @@ Backend Laravel cho dự án thương mại điện tử nông sản.
 - PHP >= 8.2
 - Composer
 - Node.js >= 18 và npm
-- MySQL 8+ (nếu chạy theo MySQL)
+- MySQL 8+
 
 ## 2. Cài đặt dự án
 
@@ -20,48 +20,13 @@ npm install
 
 ## 3. Cấu hình biến môi trường
 
+Tạo file `.env` từ file mẫu:
+
 ```bash
 copy .env.example .env
-php artisan key:generate
 ```
 
-## 4. Chạy thử nhanh (khuyến nghị) với SQLite
-
-Mặc định `.env.example` đã để `DB_CONNECTION=sqlite`.
-
-### Bước 1: Tạo file SQLite
-
-```bash
-if (!(Test-Path .\database\database.sqlite)) { New-Item .\database\database.sqlite -ItemType File }
-```
-
-### Bước 2: Migrate
-
-```bash
-php artisan migrate
-```
-
-### Bước 3: Chạy server
-
-```bash
-php artisan serve
-```
-
-Truy cập: http://127.0.0.1:8000
-
-## 5. Chạy với MySQL + dữ liệu mẫu từ file SQL
-
-Nếu muốn dùng schema/dữ liệu mẫu có sẵn trong dự án (`ecommerce_schema_mysql.sql`, `ecommerce_seed_data.sql`):
-
-### Bước 1: Tạo database (ví dụ)
-
-```sql
-CREATE DATABASE tmdt CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
-
-### Bước 2: Cập nhật `.env`
-
-Sửa các biến sau trong file `.env`:
+Sau đó cập nhật cấu hình database trong `.env`:
 
 ```env
 DB_CONNECTION=mysql
@@ -72,42 +37,66 @@ DB_USERNAME=root
 DB_PASSWORD=your_password
 ```
 
-### Bước 3: Import schema và seed data
+Tiếp theo tạo application key:
+
+```bash
+php artisan key:generate
+```
+
+## 4. Tạo database MySQL
+
+Tạo database mới trong MySQL, ví dụ:
+
+```sql
+CREATE DATABASE tmdt CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+## 5. Import schema và dữ liệu mẫu
+
+Dự án đã có sẵn 2 file SQL:
+
+- `ecommerce_schema_mysql.sql`: cấu trúc database
+- `ecommerce_seed_data.sql`: dữ liệu mẫu
+
+Chạy lần lượt các lệnh sau:
 
 ```bash
 mysql -u root -p tmdt < ecommerce_schema_mysql.sql
 mysql -u root -p tmdt < ecommerce_seed_data.sql
 ```
 
-### Bước 4: Chạy server
+Nếu bạn dùng user hoặc tên database khác, thay lại trong câu lệnh cho đúng.
+
+## 6. Chạy dự án
+
+### Chạy Laravel server
 
 ```bash
 php artisan serve
 ```
 
-## 6. Chạy frontend assets (nếu cần)
+Truy cập: http://127.0.0.1:8000
 
-Chế độ development (Vite watch):
+### Chạy Vite ở môi trường phát triển
 
 ```bash
 npm run dev
 ```
 
-Build production assets:
-
-```bash
-npm run build
-```
-
-## 7. Chạy tất cả dịch vụ bằng 1 lệnh
-
-Dự án có script Composer `dev` để chạy đồng thời server, queue, logs và Vite:
+### Hoặc chạy đồng thời các dịch vụ của dự án
 
 ```bash
 composer run dev
 ```
 
-## 8. Chạy test
+Lệnh trên sẽ chạy đồng thời:
+
+- Laravel development server
+- Queue listener
+- Laravel logs
+- Vite development server
+
+## 7. Chạy test
 
 ```bash
 composer test
