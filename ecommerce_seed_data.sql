@@ -2,7 +2,7 @@
 -- Tương thích: MySQL 8.0+
 
 SET NAMES utf8mb4;
-USE `ecommerce_db`;
+-- USE `ecommerce_db`;
 
 SET FOREIGN_KEY_CHECKS = 0;
 

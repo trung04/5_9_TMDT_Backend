@@ -11,6 +11,9 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
     public const ROLE_CUSTOMER = 'CUSTOMER';
+    public const ROLE_ADMIN = 'ADMIN';
+    public const ROLE_WAREHOUSE_STAFF = 'WAREHOUSE_STAFF';
+    public const ROLE_SUPPLIER = 'SUPPLIER';
 
     public const STATUS_ACTIVE = 'ACTIVE';
 
