@@ -7,8 +7,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Supplier extends Model
 {
-    protected $table = 'suppliers';
-
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
     protected $fillable = [
         'supplier_code',
         'name',
@@ -19,14 +22,33 @@ class Supplier extends Model
         'is_active',
     ];
 
-    protected $casts = [
-        'is_active' => 'boolean',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
-    ];
+    /**
+     * The attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'is_active' => 'boolean',
+            'created_at' => 'datetime',
+            'updated_at' => 'datetime',
+        ];
+    }
 
+    /**
+     * Get the products supplied by this supplier.
+     */
     public function products(): HasMany
     {
-        return $this->hasMany(Product::class, 'supplier_id');
+        return $this->hasMany(Product::class);
+    }
+
+    /**
+     * Get the prices offered by this supplier.
+     */
+    public function prices(): HasMany
+    {
+        return $this->hasMany(Price::class);
     }
 }

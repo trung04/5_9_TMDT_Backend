@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Product extends Model
+class Price extends Model
 {
     /**
      * The attributes that are mass assignable.
@@ -13,13 +13,11 @@ class Product extends Model
      * @var list<string>
      */
     protected $fillable = [
-        'category_id',
+        'product_id',
         'supplier_id',
-        'sku',
-        'name',
-        'description',
-        'sale_price',
-        'stock_quantity',
+        'cost_price',
+        'effective_from',
+        'effective_to',
         'is_active',
     ];
 
@@ -31,7 +29,9 @@ class Product extends Model
     protected function casts(): array
     {
         return [
-            'sale_price' => 'decimal:2',
+            'cost_price' => 'decimal:2',
+            'effective_from' => 'datetime',
+            'effective_to' => 'datetime',
             'is_active' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
@@ -39,15 +39,15 @@ class Product extends Model
     }
 
     /**
-     * Get the category that this product belongs to.
+     * Get the product that this price belongs to.
      */
-    public function category(): BelongsTo
+    public function product(): BelongsTo
     {
-        return $this->belongsTo(Category::class);
+        return $this->belongsTo(Product::class);
     }
 
     /**
-     * Get the supplier that this product belongs to.
+     * Get the supplier that this price belongs to.
      */
     public function supplier(): BelongsTo
     {
