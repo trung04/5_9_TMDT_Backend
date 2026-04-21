@@ -2,7 +2,7 @@
 -- Tương thích: MySQL 8.0+
 
 SET NAMES utf8mb4;
-USE `ecommerce_db`;
+-- USE `ecommerce_db`;
 
 SET FOREIGN_KEY_CHECKS = 0;
 
@@ -30,10 +30,13 @@ SET FOREIGN_KEY_CHECKS = 1;
 
 INSERT INTO `users` (`id`, `full_name`, `email`, `phone`, `password_hash`, `role`, `status`, `is_active`, `created_at`, `updated_at`) VALUES
 (1, 'Nguyen Van Admin', 'admin@shop.local', '0900000001', '$2y$10$adminhashdemo000000000000000000000000000000000000000000', 'ADMIN', 'ACTIVE', TRUE, '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
-(2, 'Tran Thi Customer', 'customer1@shop.local', '0900000002', '$2y$10$customerhashdemo0000000000000000000000000000000000000', 'CUSTOMER', 'ACTIVE', TRUE, '2026-01-02 09:00:00', '2026-01-02 09:00:00'),
+(2, 'Tran Thi Customer', 'customer1@shop.local', '0900000002', '$2y$10$FhHMK0IzDB8ZxIYG5OkLG.vVrOHkZlhnAnL9xICDXh1/l.q.Egg0y', 'CUSTOMER', 'ACTIVE', TRUE, '2026-01-02 09:00:00', '2026-01-02 09:00:00'),
 (3, 'Le Van Kho', 'warehouse@shop.local', '0900000003', '$2y$10$warehousehashdemo00000000000000000000000000000000000', 'WAREHOUSE_STAFF', 'ACTIVE', TRUE, '2026-01-03 10:00:00', '2026-01-03 10:00:00'),
 (4, 'Pham Thi NCC', 'supplieruser@shop.local', '0900000004', '$2y$10$supplierhashdemo000000000000000000000000000000000000', 'SUPPLIER', 'ACTIVE', TRUE, '2026-01-04 11:00:00', '2026-01-04 11:00:00'),
-(5, 'Do Minh Khach', 'customer2@shop.local', '0900000005', '$2y$10$customerhashdemo2222222222222222222222222222222222222', 'CUSTOMER', 'ACTIVE', TRUE, '2026-01-05 12:00:00', '2026-01-05 12:00:00');
+(5, 'Do Minh Khach', 'customer2@shop.local', '0900000005', '$2y$10$customerhashdemo2222222222222222222222222222222222222', 'CUSTOMER', 'ACTIVE', TRUE, '2026-01-05 12:00:00', '2026-01-05 12:00:00'),
+(6, 'Active User', 'active@example.com', '0901111111', '$2y$10$FhHMK0IzDB8ZxIYG5OkLG.vVrOHkZlhnAnL9xICDXh1/l.q.Egg0y', 'CUSTOMER', 'ACTIVE', TRUE, '2026-01-06 08:00:00', '2026-01-06 08:00:00'),
+(7, 'Blocked User', 'blocked@example.com', '0902222222', '$2y$10$V16cweZ4GbJErB4o5Ofpxe6l4XEcKLZObVq.c3HviLflPzjXHIdYC', 'CUSTOMER', 'BLOCKED', TRUE, '2026-01-06 08:05:00', '2026-01-06 08:05:00'),
+(8, 'Inactive User', 'inactive@example.com', '0903333333', '$2y$10$vfS7C5p/ImE1xzQi7Mok9Odn4UxJwgYb7qkXmD1jqPhSbipqg.dES', 'CUSTOMER', 'INACTIVE', TRUE, '2026-01-06 08:10:00', '2026-01-06 08:10:00');
 
 INSERT INTO `categories` (`id`, `name`, `description`, `is_active`, `created_at`, `updated_at`) VALUES
 (1, 'Dien thoai', 'Danh muc dien thoai thong minh.', TRUE, '2026-01-01 08:10:00', '2026-01-01 08:10:00'),
@@ -147,7 +150,7 @@ INSERT INTO `delivery_requests` (`id`, `requested_by_user_id`, `product_id`, `re
 (3, 3, 3, 5, 'MacBook Air can nhap bo sung trong tuan toi.', 'FULFILLED', 1, '2026-02-01 08:00:00', '2026-02-05 16:00:00');
 
 -- Dong bo AUTO_INCREMENT cho cac bang chinh khi can
-ALTER TABLE `users` AUTO_INCREMENT = 6;
+ALTER TABLE `users` AUTO_INCREMENT = 9;
 ALTER TABLE `categories` AUTO_INCREMENT = 5;
 ALTER TABLE `suppliers` AUTO_INCREMENT = 4;
 ALTER TABLE `inventories` AUTO_INCREMENT = 3;

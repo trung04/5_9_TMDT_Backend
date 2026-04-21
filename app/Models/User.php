@@ -2,16 +2,43 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
+    public const ROLE_CUSTOMER = 'CUSTOMER';
+    public const ROLE_ADMIN = 'ADMIN';
+    public const ROLE_WAREHOUSE_STAFF = 'WAREHOUSE_STAFF';
+    public const ROLE_SUPPLIER = 'SUPPLIER';
+
+    public const STATUS_ACTIVE = 'ACTIVE';
+
+    public const STATUS_INACTIVE = 'INACTIVE';
+
+    public const STATUS_BLOCKED = 'BLOCKED';
+
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
+
+    /**
+     * The password column used by Laravel authentication.
+     *
+     * @var string
+     */
+    protected $authPasswordName = 'password_hash';
+
+    /**
+     * Disable remember-me token support because the table has no column for it.
+     *
+     * @var string
+     */
+    protected $rememberTokenName = '';
 
     /**
      * The attributes that are mass assignable.
@@ -19,9 +46,13 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-        'name',
+        'full_name',
         'email',
-        'password',
+        'phone',
+        'password_hash',
+        'role',
+        'status',
+        'is_active',
     ];
 
     /**
@@ -30,8 +61,7 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $hidden = [
-        'password',
-        'remember_token',
+        'password_hash',
     ];
 
     /**
@@ -42,8 +72,41 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'is_active' => 'boolean',
+            'created_at' => 'datetime',
+            'updated_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Determine whether the account is allowed to sign in.
+     */
+    public function canAuthenticate(): bool
+    {
+        return $this->status === self::STATUS_ACTIVE && $this->is_active;
+    }
+
+    /**
+     * Get the carts that belong to this user.
+     */
+    public function carts(): HasMany
+    {
+        return $this->hasMany(Cart::class);
+    }
+
+    /**
+     * Get the active cart for this user.
+     */
+    public function activeCart(): HasOne
+    {
+        return $this->hasOne(Cart::class)->where('status', Cart::STATUS_ACTIVE);
+    }
+
+    /**
+     * Get the orders that belong to this user.
+     */
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
     }
 }
