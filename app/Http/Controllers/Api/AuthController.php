@@ -66,9 +66,11 @@ class AuthController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
+        $token = $user->currentAccessToken();
 
         return response()->json([
             'user' => $this->userData($user),
+            'expires_at' => $token?->expires_at?->toIso8601String(),
         ]);
     }
 
@@ -93,12 +95,21 @@ class AuthController extends Controller
      */
     private function authenticatedResponse(User $user, string $message, int $status = 200): JsonResponse
     {
-        $token = $user->createToken('auth_token')->plainTextToken;
+        $user->tokens()->delete();
+
+        $expirationMinutes = max((int) config('sanctum.expiration', 120), 1);
+        $accessToken = $user->createToken('auth_token');
+        $expiresAt = now()->addMinutes($expirationMinutes);
+
+        $accessToken->accessToken->forceFill([
+            'expires_at' => $expiresAt,
+        ])->save();
 
         return response()->json([
             'message' => $message,
-            'access_token' => $token,
+            'access_token' => $accessToken->plainTextToken,
             'token_type' => 'Bearer',
+            'expires_at' => $expiresAt->toIso8601String(),
             'user' => $this->userData($user),
         ], $status);
     }

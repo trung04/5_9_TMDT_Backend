@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\EnsuresAdminAccess;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CategoryRequest;
 use App\Models\Category;
@@ -11,6 +12,8 @@ use Illuminate\Http\Request;
 
 class CategoryController extends Controller
 {
+    use EnsuresAdminAccess;
+
     private CategoryService $categoryService;
 
     public function __construct(CategoryService $categoryService)
@@ -67,6 +70,10 @@ class CategoryController extends Controller
      */
     public function store(CategoryRequest $request): JsonResponse
     {
+        if ($response = $this->ensureAdmin($request)) {
+            return $response;
+        }
+
         $category = $this->categoryService->createCategory($request->validated());
 
         return response()->json([
@@ -82,6 +89,10 @@ class CategoryController extends Controller
      */
     public function update(CategoryRequest $request, Category $category): JsonResponse
     {
+        if ($response = $this->ensureAdmin($request)) {
+            return $response;
+        }
+
         $updatedCategory = $this->categoryService->updateCategory(
             $category,
             $request->validated()
@@ -98,8 +109,12 @@ class CategoryController extends Controller
      *
      * @urlParam id int The category ID. Example: 1
      */
-    public function destroy(Category $category): JsonResponse
+    public function destroy(Request $request, Category $category): JsonResponse
     {
+        if ($response = $this->ensureAdmin($request)) {
+            return $response;
+        }
+
         $this->categoryService->deleteCategory($category);
 
         return response()->json([

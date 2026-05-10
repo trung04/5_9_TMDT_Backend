@@ -14,19 +14,22 @@ class CartService
 {
     public function getOrCreateActiveCart(User $user): Cart
     {
-        $cart = Cart::query()
-            ->where('user_id', $user->id)
-            ->where('status', Cart::STATUS_ACTIVE)
-            ->first();
+        return DB::transaction(function () use ($user): Cart {
+            $cart = $this->getReusableCartForUpdate($user);
 
-        if (! $cart) {
-            $cart = Cart::query()->create([
-                'user_id' => $user->id,
-                'status' => Cart::STATUS_ACTIVE,
-            ]);
-        }
+            if (! $cart) {
+                $cart = Cart::query()->create([
+                    'user_id' => $user->id,
+                    'status' => Cart::STATUS_ACTIVE,
+                ]);
+            } elseif ($cart->status !== Cart::STATUS_ACTIVE) {
+                $cart->update([
+                    'status' => Cart::STATUS_ACTIVE,
+                ]);
+            }
 
-        return $this->loadCart($cart);
+            return $this->loadCart($cart->fresh());
+        });
     }
 
     /**
@@ -54,13 +57,24 @@ class CartService
     public function addItem(User $user, int $productId, int $quantity): Cart
     {
         return DB::transaction(function () use ($user, $productId, $quantity): Cart {
-            $cart = $this->getActiveCartForUpdate($user);
+            if ($quantity <= 0) {
+                throw ValidationException::withMessages([
+                    'quantity' => ['The quantity must be greater than 0.'],
+                ]);
+            }
+
+            $cart = $this->getReusableCartForUpdate($user);
 
             if (! $cart) {
                 $cart = Cart::query()->create([
                     'user_id' => $user->id,
                     'status' => Cart::STATUS_ACTIVE,
                 ]);
+            } elseif ($cart->status !== Cart::STATUS_ACTIVE) {
+                $cart->update([
+                    'status' => Cart::STATUS_ACTIVE,
+                ]);
+                $cart = $cart->fresh();
             }
 
             $product = Product::query()->lockForUpdate()->find($productId);
@@ -82,21 +96,20 @@ class CartService
             $this->ensureQuantityIsAvailable($product, $targetQuantity);
 
             $unitPrice = (float) $product->sale_price;
-            $lineTotal = $this->lineTotal($targetQuantity, $unitPrice);
 
             if ($existingItem) {
                 $existingItem->update([
                     'quantity' => $targetQuantity,
                     'unit_price' => $this->decimal($unitPrice),
-                    'line_total' => $this->decimal($lineTotal),
+                    'line_total' => $this->decimal($this->lineTotal($targetQuantity, $unitPrice)),
                 ]);
             } else {
                 CartItem::query()->create([
                     'cart_id' => $cart->id,
                     'product_id' => $product->id,
-                    'quantity' => $targetQuantity,
+                    'quantity' => $quantity,
                     'unit_price' => $this->decimal($unitPrice),
-                    'line_total' => $this->decimal($lineTotal),
+                    'line_total' => $this->decimal($this->lineTotal($quantity, $unitPrice)),
                 ]);
             }
 
@@ -127,6 +140,13 @@ class CartService
                 ]);
             }
 
+            if ($quantity <= 0) {
+                $cart = $cartItem->cart()->firstOrFail();
+                $cartItem->delete();
+
+                return $this->loadCart($cart->fresh());
+            }
+
             $this->ensureQuantityIsAvailable($product, $quantity);
 
             $unitPrice = (float) $product->sale_price;
@@ -138,7 +158,7 @@ class CartService
                 'line_total' => $this->decimal($lineTotal),
             ]);
 
-            return $this->loadCart($cartItem->cart()->firstOrFail());
+            return $this->loadCart($cartItem->cart()->firstOrFail()->fresh());
         });
     }
 
@@ -153,11 +173,21 @@ class CartService
         });
     }
 
-    private function getActiveCartForUpdate(User $user): ?Cart
+    private function getReusableCartForUpdate(User $user): ?Cart
     {
-        return Cart::query()
+        $activeCart = Cart::query()
             ->where('user_id', $user->id)
             ->where('status', Cart::STATUS_ACTIVE)
+            ->lockForUpdate()
+            ->first();
+
+        if ($activeCart) {
+            return $activeCart;
+        }
+
+        return Cart::query()
+            ->where('user_id', $user->id)
+            ->orderByDesc('id')
             ->lockForUpdate()
             ->first();
     }
@@ -176,6 +206,12 @@ class CartService
         if (! $product->is_active) {
             throw ValidationException::withMessages([
                 'product_id' => ['The selected product is unavailable.'],
+            ]);
+        }
+
+        if ($quantity <= 0) {
+            throw ValidationException::withMessages([
+                'quantity' => ['The quantity must be greater than 0.'],
             ]);
         }
 

@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Payment extends Model
 {
     public const STATUS_PENDING = 'PENDING';
+    public const STATUS_SUCCESS = 'SUCCESS';
+    public const STATUS_FAILED = 'FAILED';
+    public const STATUS_REFUNDED = 'REFUNDED';
 
     /**
      * The attributes that are mass assignable.
@@ -39,6 +42,19 @@ class Payment extends Model
             'raw_payload' => 'array',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function allowedStatuses(): array
+    {
+        return [
+            self::STATUS_PENDING,
+            self::STATUS_SUCCESS,
+            self::STATUS_FAILED,
+            self::STATUS_REFUNDED,
         ];
     }
 

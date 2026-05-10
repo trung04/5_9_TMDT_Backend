@@ -15,6 +15,17 @@ CREATE TABLE IF NOT EXISTS `users` (
   `email` VARCHAR(120) NOT NULL,
   `phone` VARCHAR(20) NOT NULL,
   `password_hash` VARCHAR(255) NOT NULL,
+  `address` VARCHAR(255) NULL,
+  `city` VARCHAR(120) NULL,
+  `favorite_region` VARCHAR(120) NULL,
+  `avatar_url` TEXT NULL,
+  `newsletter` BOOLEAN NOT NULL DEFAULT FALSE,
+  `sms_alerts` BOOLEAN NOT NULL DEFAULT FALSE,
+  `order_email` BOOLEAN NOT NULL DEFAULT TRUE,
+  `security_alerts` BOOLEAN NOT NULL DEFAULT TRUE,
+  `reward_points` INT UNSIGNED NOT NULL DEFAULT 0,
+  `reward_tier` VARCHAR(50) NOT NULL DEFAULT 'Bronze',
+  `next_tier_points` INT UNSIGNED NOT NULL DEFAULT 500,
   `role` ENUM('CUSTOMER','ADMIN','WAREHOUSE_STAFF','SUPPLIER') NOT NULL,
   `status` ENUM('ACTIVE','INACTIVE','BLOCKED') NOT NULL DEFAULT 'ACTIVE',
   `is_active` BOOLEAN NOT NULL DEFAULT TRUE,
@@ -23,6 +34,52 @@ CREATE TABLE IF NOT EXISTS `users` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_users_email` (`email`),
   UNIQUE KEY `uk_users_phone` (`phone`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `user_addresses` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT UNSIGNED NOT NULL,
+  `label` VARCHAR(120) NOT NULL,
+  `recipient` VARCHAR(120) NOT NULL,
+  `phone` VARCHAR(20) NOT NULL,
+  `line1` VARCHAR(255) NOT NULL,
+  `city` VARCHAR(120) NOT NULL,
+  `note` VARCHAR(500) NULL,
+  `is_default` BOOLEAN NOT NULL DEFAULT FALSE,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_user_addresses_user_id` (`user_id`),
+  CONSTRAINT `fk_user_addresses_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `reward_redemptions` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT UNSIGNED NOT NULL,
+  `title` VARCHAR(255) NOT NULL,
+  `points_used` INT UNSIGNED NOT NULL,
+  `status` ENUM('COMPLETED','PENDING') NOT NULL DEFAULT 'COMPLETED',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_reward_redemptions_user_id` (`user_id`),
+  CONSTRAINT `fk_reward_redemptions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `supplier_invitations` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `supplier_name` VARCHAR(150) NOT NULL,
+  `contact_name` VARCHAR(120) NOT NULL,
+  `email` VARCHAR(120) NOT NULL,
+  `categories` JSON NULL,
+  `note` VARCHAR(500) NULL,
+  `status` ENUM('DRAFT','SENT') NOT NULL DEFAULT 'SENT',
+  `created_by_user_id` BIGINT UNSIGNED NOT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_supplier_invitations_created_by_user_id` (`created_by_user_id`),
+  CONSTRAINT `fk_supplier_invitations_created_by_user` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `categories` (
@@ -347,4 +404,84 @@ CREATE TABLE IF NOT EXISTS `delivery_requests` (
   CONSTRAINT `fk_delivery_requests_requested_by_user` FOREIGN KEY (`requested_by_user_id`) REFERENCES `users` (`id`),
   CONSTRAINT `fk_delivery_requests_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`),
   CONSTRAINT `fk_delivery_requests_approved_by_user` FOREIGN KEY (`approved_by_user_id`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+
+-- PHAN THEM: CSDL CHO CAC CHUC NANG ACCOUNT/ADMIN
+
+
+ALTER TABLE `users`
+  ADD COLUMN IF NOT EXISTS `address` VARCHAR(255) NULL AFTER `password_hash`,
+  ADD COLUMN IF NOT EXISTS `city` VARCHAR(120) NULL AFTER `address`,
+  ADD COLUMN IF NOT EXISTS `favorite_region` VARCHAR(120) NULL AFTER `city`,
+  ADD COLUMN IF NOT EXISTS `avatar_url` TEXT NULL AFTER `favorite_region`,
+  ADD COLUMN IF NOT EXISTS `newsletter` BOOLEAN NOT NULL DEFAULT FALSE AFTER `avatar_url`,
+  ADD COLUMN IF NOT EXISTS `sms_alerts` BOOLEAN NOT NULL DEFAULT FALSE AFTER `newsletter`,
+  ADD COLUMN IF NOT EXISTS `order_email` BOOLEAN NOT NULL DEFAULT TRUE AFTER `sms_alerts`,
+  ADD COLUMN IF NOT EXISTS `security_alerts` BOOLEAN NOT NULL DEFAULT TRUE AFTER `order_email`,
+  ADD COLUMN IF NOT EXISTS `reward_points` INT UNSIGNED NOT NULL DEFAULT 0 AFTER `security_alerts`,
+  ADD COLUMN IF NOT EXISTS `reward_tier` VARCHAR(50) NOT NULL DEFAULT 'Bronze' AFTER `reward_points`,
+  ADD COLUMN IF NOT EXISTS `next_tier_points` INT UNSIGNED NOT NULL DEFAULT 500 AFTER `reward_tier`;
+
+CREATE TABLE IF NOT EXISTS `user_addresses` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT UNSIGNED NOT NULL,
+  `label` VARCHAR(120) NOT NULL,
+  `recipient` VARCHAR(120) NOT NULL,
+  `phone` VARCHAR(20) NOT NULL,
+  `line1` VARCHAR(255) NOT NULL,
+  `city` VARCHAR(120) NOT NULL,
+  `note` TEXT NULL,
+  `is_default` BOOLEAN NOT NULL DEFAULT FALSE,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_user_addresses_user_id_patch` (`user_id`),
+  CONSTRAINT `fk_user_addresses_user_patch` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `reward_redemptions` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT UNSIGNED NOT NULL,
+  `title` VARCHAR(255) NOT NULL,
+  `points_used` INT UNSIGNED NOT NULL,
+  `status` VARCHAR(50) NOT NULL DEFAULT 'COMPLETED',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_reward_redemptions_user_id_patch` (`user_id`),
+  CONSTRAINT `fk_reward_redemptions_user_patch` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `wishlist_items` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT UNSIGNED NOT NULL,
+  `product_id` BIGINT UNSIGNED NOT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_wishlist_items_user_product_patch` (`user_id`, `product_id`),
+  KEY `idx_wishlist_items_product_id_patch` (`product_id`),
+  CONSTRAINT `fk_wishlist_items_user_patch` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_wishlist_items_product_patch` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `admin_settings` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT UNSIGNED NOT NULL,
+  `store_name` VARCHAR(150) NOT NULL DEFAULT 'Heritage Harvest',
+  `support_email` VARCHAR(120) NULL,
+  `support_phone` VARCHAR(20) NULL,
+  `low_stock_threshold` INT UNSIGNED NOT NULL DEFAULT 5,
+  `dashboard_refresh_seconds` INT UNSIGNED NOT NULL DEFAULT 60,
+  `order_auto_confirm` BOOLEAN NOT NULL DEFAULT FALSE,
+  `send_daily_summary` BOOLEAN NOT NULL DEFAULT TRUE,
+  `maintenance_mode` BOOLEAN NOT NULL DEFAULT FALSE,
+  `notes` TEXT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_admin_settings_user_id_patch` (`user_id`),
+  CONSTRAINT `fk_admin_settings_user_patch` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

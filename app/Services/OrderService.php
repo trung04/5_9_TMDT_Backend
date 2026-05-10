@@ -82,24 +82,27 @@ class OrderService
             $shippingFee = 0.0;
             $discountAmount = 0.0;
             $totalAmount = $subtotal + $shippingFee - $discountAmount;
+            $paymentMethod = $attributes['payment_method'] ?? Order::PAYMENT_METHOD_COD;
+            $paymentGateway = !empty($attributes['payment_gateway'])
+                ? trim((string) $attributes['payment_gateway'])
+                : null;
+
+            $orderNo = 'ORD-' . now()->format('YmdHis') . '-' . random_int(1000, 9999);
+            $transactionCode = 'PAY-' . now()->format('YmdHis') . '-' . random_int(1000, 9999);
 
             $order = Order::query()->create([
                 'user_id' => $user->id,
-                'order_no' => null,
+                'order_no' => $orderNo,
                 'recipient_name' => $attributes['recipient_name'],
                 'recipient_phone' => $attributes['recipient_phone'],
                 'shipping_address' => $attributes['shipping_address'],
-                'payment_method' => Order::PAYMENT_METHOD_COD,
+                'payment_method' => $paymentMethod,
                 'status' => Order::STATUS_PENDING,
                 'subtotal' => $this->decimal($subtotal),
                 'shipping_fee' => $this->decimal($shippingFee),
                 'discount_amount' => $this->decimal($discountAmount),
                 'total_amount' => $this->decimal($totalAmount),
-                'note' => $attributes['note'] ?: null,
-            ]);
-
-            $order->update([
-                'order_no' => sprintf('ORD-%s%04d', now()->format('Y'), $order->id),
+                'note' => !empty($attributes['note']) ? $attributes['note'] : null,
             ]);
 
             foreach ($cartItems as $cartItem) {
@@ -119,16 +122,23 @@ class OrderService
                 $product->decrement('stock_quantity', $cartItem->quantity);
             }
 
+            [$gatewayName, $gatewayReference, $paymentStatus, $rawPayload] = $this->paymentMetadata(
+                $paymentMethod,
+                $paymentGateway,
+                $transactionCode,
+                $totalAmount
+            );
+
             Payment::query()->create([
                 'order_id' => $order->id,
-                'transaction_code' => null,
-                'payment_method' => Order::PAYMENT_METHOD_COD,
-                'payment_status' => Payment::STATUS_PENDING,
+                'transaction_code' => $transactionCode,
+                'payment_method' => $paymentMethod,
+                'payment_status' => $paymentStatus,
                 'amount' => $this->decimal($totalAmount),
-                'gateway_name' => null,
-                'gateway_reference' => null,
-                'paid_at' => null,
-                'raw_payload' => null,
+                'gateway_name' => $gatewayName,
+                'gateway_reference' => $gatewayReference,
+                'paid_at' => $paymentStatus === Payment::STATUS_SUCCESS ? now() : null,
+                'raw_payload' => $rawPayload,
             ]);
 
             OrderStatusHistory::query()->create([
@@ -136,13 +146,13 @@ class OrderService
                 'changed_by_user_id' => $user->id,
                 'from_status' => null,
                 'to_status' => Order::STATUS_PENDING,
-                'note' => 'Order created by customer checkout.',
+                'note' => sprintf('Order created by customer checkout with payment method %s.', $paymentMethod),
                 'changed_at' => now(),
             ]);
 
-            $cart->update([
-                'status' => Cart::STATUS_CHECKED_OUT,
-            ]);
+            CartItem::query()
+                ->where('cart_id', $cart->id)
+                ->delete();
 
             return $this->findUserOrder($user, $order->id) ?? $order;
         });
@@ -163,6 +173,7 @@ class OrderService
             ->where('user_id', $user->id)
             ->where('id', $orderId)
             ->with([
+                'user',
                 'items' => fn ($query) => $query->orderBy('id'),
                 'payment',
                 'statusHistory' => fn ($query) => $query->orderBy('changed_at'),
@@ -170,12 +181,114 @@ class OrderService
             ->first();
     }
 
+    public function listAdminOrders(array $filters = [], int $perPage = 15): LengthAwarePaginator
+    {
+        $query = Order::query()
+            ->with(['user', 'items', 'payment'])
+            ->orderByDesc('id');
+
+        if (! empty($filters['status'])) {
+            $query->where('status', (string) $filters['status']);
+        }
+
+        if (! empty($filters['keyword'])) {
+            $keyword = trim((string) $filters['keyword']);
+
+            $query->where(function ($builder) use ($keyword): void {
+                $builder->where('order_no', 'like', "%{$keyword}%")
+                    ->orWhere('recipient_name', 'like', "%{$keyword}%")
+                    ->orWhere('recipient_phone', 'like', "%{$keyword}%")
+                    ->orWhere('shipping_address', 'like', "%{$keyword}%")
+                    ->orWhereHas('user', function ($userQuery) use ($keyword): void {
+                        $userQuery->where('full_name', 'like', "%{$keyword}%")
+                            ->orWhere('email', 'like', "%{$keyword}%");
+                    });
+            });
+        }
+
+        return $query->paginate($perPage);
+    }
+
+    public function findAdminOrder(int $orderId): ?Order
+    {
+        return Order::query()
+            ->where('id', $orderId)
+            ->with([
+                'user',
+                'items' => fn ($query) => $query->orderBy('id'),
+                'payment',
+                'statusHistory' => fn ($query) => $query->orderBy('changed_at'),
+            ])
+            ->first();
+    }
+
+    public function updateOrderStatus(Order $order, string $nextStatus, User $actor, ?string $note = null): Order
+    {
+        return DB::transaction(function () use ($order, $nextStatus, $actor, $note): Order {
+            $lockedOrder = Order::query()
+                ->where('id', $order->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $currentStatus = $lockedOrder->status;
+
+            if ($currentStatus !== $nextStatus) {
+                $lockedOrder->update([
+                    'status' => $nextStatus,
+                ]);
+
+                OrderStatusHistory::query()->create([
+                    'order_id' => $lockedOrder->id,
+                    'changed_by_user_id' => $actor->id,
+                    'from_status' => $currentStatus,
+                    'to_status' => $nextStatus,
+                    'note' => $note,
+                    'changed_at' => now(),
+                ]);
+            }
+
+            return $this->findAdminOrder($lockedOrder->id) ?? $lockedOrder;
+        });
+    }
+
+    public function updatePaymentStatus(
+        Order $order,
+        string $nextStatus,
+        User $actor,
+        ?string $note = null
+    ): Order {
+        return DB::transaction(function () use ($order, $nextStatus, $actor, $note): Order {
+            $payment = Payment::query()
+                ->where('order_id', $order->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($payment->payment_status !== $nextStatus) {
+                $payment->update([
+                    'payment_status' => $nextStatus,
+                    'paid_at' => $nextStatus === Payment::STATUS_SUCCESS ? now() : $payment->paid_at,
+                ]);
+
+                OrderStatusHistory::query()->create([
+                    'order_id' => $order->id,
+                    'changed_by_user_id' => $actor->id,
+                    'from_status' => $order->status,
+                    'to_status' => $order->status,
+                    'note' => $note ?: sprintf('Payment status updated to %s.', $nextStatus),
+                    'changed_at' => now(),
+                ]);
+            }
+
+            return $this->findAdminOrder($order->id) ?? $order;
+        });
+    }
+
     /**
      * @return array<string, mixed>
      */
     public function orderSummaryPayload(Order $order): array
     {
-        $order->loadMissing(['items', 'payment']);
+        $order->loadMissing(['user', 'items', 'payment']);
 
         return [
             'id' => $order->id,
@@ -187,6 +300,7 @@ class OrderService
             'discount_amount' => $order->discount_amount,
             'total_amount' => $order->total_amount,
             'item_count' => $order->items->count(),
+            'customer' => $order->user ? $this->customerPayload($order->user) : null,
             'payment' => $order->payment ? $this->paymentPayload($order->payment) : null,
             'created_at' => $order->created_at,
             'updated_at' => $order->updated_at,
@@ -199,6 +313,7 @@ class OrderService
     public function orderDetailPayload(Order $order): array
     {
         $order->loadMissing([
+            'user',
             'items' => fn ($query) => $query->orderBy('id'),
             'payment',
             'statusHistory' => fn ($query) => $query->orderBy('changed_at'),
@@ -217,6 +332,7 @@ class OrderService
             'discount_amount' => $order->discount_amount,
             'total_amount' => $order->total_amount,
             'note' => $order->note,
+            'customer' => $order->user ? $this->customerPayload($order->user) : null,
             'items' => $order->items->map(fn (OrderItem $item): array => $this->orderItemPayload($item))->values()->all(),
             'payment' => $order->payment ? $this->paymentPayload($order->payment) : null,
             'status_history' => $order->statusHistory->map(
@@ -224,6 +340,22 @@ class OrderService
             )->values()->all(),
             'created_at' => $order->created_at,
             'updated_at' => $order->updated_at,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function customerPayload(User $user): array
+    {
+        return [
+            'id' => $user->id,
+            'full_name' => $user->full_name,
+            'email' => $user->email,
+            'phone' => $user->phone,
+            'role' => $user->role,
+            'status' => $user->status,
+            'is_active' => $user->is_active,
         ];
     }
 
@@ -260,6 +392,57 @@ class OrderService
             'paid_at' => $payment->paid_at,
             'created_at' => $payment->created_at,
             'updated_at' => $payment->updated_at,
+        ];
+    }
+
+    /**
+     * @return array{0:string|null,1:string|null,2:string,3:array<string,mixed>|null}
+     */
+    private function paymentMetadata(
+        string $paymentMethod,
+        ?string $paymentGateway,
+        string $transactionCode,
+        float $totalAmount
+    ): array {
+        if ($paymentMethod === Order::PAYMENT_METHOD_BANK_TRANSFER) {
+            $gatewayName = $paymentGateway ?: 'Vietcombank';
+
+            return [
+                $gatewayName,
+                'BANK-' . $transactionCode,
+                Payment::STATUS_PENDING,
+                [
+                    'instructions' => 'Transfer to the displayed bank account and wait for admin confirmation.',
+                    'virtual_account_name' => 'HERITAGE HARVEST',
+                    'virtual_account_no' => '0123456789',
+                    'amount' => $this->decimal($totalAmount),
+                ],
+            ];
+        }
+
+        if ($paymentMethod === Order::PAYMENT_METHOD_E_WALLET) {
+            $gatewayName = $paymentGateway ?: 'MoMo';
+
+            return [
+                $gatewayName,
+                'EWALLET-' . $transactionCode,
+                Payment::STATUS_PENDING,
+                [
+                    'instructions' => 'Complete the wallet payment and wait for gateway confirmation.',
+                    'wallet' => $gatewayName,
+                    'checkout_code' => 'QR-' . substr($transactionCode, -8),
+                    'amount' => $this->decimal($totalAmount),
+                ],
+            ];
+        }
+
+        return [
+            null,
+            null,
+            Payment::STATUS_PENDING,
+            [
+                'instructions' => 'Pay cash when the order is delivered.',
+            ],
         ];
     }
 

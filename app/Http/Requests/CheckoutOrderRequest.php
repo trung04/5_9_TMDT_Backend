@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Order;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class CheckoutOrderRequest extends FormRequest
 {
@@ -18,6 +20,8 @@ class CheckoutOrderRequest extends FormRequest
             'recipient_phone' => trim((string) $this->input('recipient_phone')),
             'shipping_address' => trim((string) $this->input('shipping_address')),
             'note' => trim((string) $this->input('note', '')),
+            'payment_method' => trim((string) $this->input('payment_method', Order::PAYMENT_METHOD_COD)),
+            'payment_gateway' => trim((string) $this->input('payment_gateway', '')),
         ]);
     }
 
@@ -31,6 +35,8 @@ class CheckoutOrderRequest extends FormRequest
             'recipient_phone' => ['required', 'string', 'max:20'],
             'shipping_address' => ['required', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:1000'],
+            'payment_method' => ['required', 'string', Rule::in(Order::allowedPaymentMethods())],
+            'payment_gateway' => ['nullable', 'string', 'max:120'],
         ];
     }
 
@@ -47,6 +53,9 @@ class CheckoutOrderRequest extends FormRequest
             'shipping_address.required' => 'Shipping address is required.',
             'shipping_address.max' => 'Shipping address may not be greater than 255 characters.',
             'note.max' => 'Note may not be greater than 1000 characters.',
+            'payment_method.required' => 'Payment method is required.',
+            'payment_method.in' => 'Selected payment method is invalid.',
+            'payment_gateway.max' => 'Payment gateway may not be greater than 120 characters.',
         ];
     }
 }

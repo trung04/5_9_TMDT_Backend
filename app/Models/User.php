@@ -50,6 +50,17 @@ class User extends Authenticatable
         'email',
         'phone',
         'password_hash',
+        'address',
+        'city',
+        'favorite_region',
+        'avatar_url',
+        'newsletter',
+        'sms_alerts',
+        'order_email',
+        'security_alerts',
+        'reward_points',
+        'reward_tier',
+        'next_tier_points',
         'role',
         'status',
         'is_active',
@@ -73,6 +84,12 @@ class User extends Authenticatable
     {
         return [
             'is_active' => 'boolean',
+            'newsletter' => 'boolean',
+            'sms_alerts' => 'boolean',
+            'order_email' => 'boolean',
+            'security_alerts' => 'boolean',
+            'reward_points' => 'integer',
+            'next_tier_points' => 'integer',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
@@ -108,5 +125,40 @@ class User extends Authenticatable
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    public function notifications(): HasMany
+    {
+        return $this->hasMany(Notification::class);
+    }
+
+    public function complaints(): HasMany
+    {
+        return $this->hasMany(Complaint::class);
+    }
+
+    public function addresses(): HasMany
+    {
+        return $this->hasMany(UserAddress::class);
+    }
+
+    public function rewardRedemptions(): HasMany
+    {
+        return $this->hasMany(RewardRedemption::class);
+    }
+
+    public function wishlistItems(): HasMany
+    {
+        return $this->hasMany(WishlistItem::class);
+    }
+
+    public function adminSetting(): HasOne
+    {
+        return $this->hasOne(AdminSetting::class);
+    }
+
+    public function createdSupplierInvitations(): HasMany
+    {
+        return $this->hasMany(SupplierInvitation::class, 'created_by_user_id');
     }
 }

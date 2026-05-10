@@ -10,8 +10,15 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class Order extends Model
 {
     public const PAYMENT_METHOD_COD = 'COD';
+    public const PAYMENT_METHOD_BANK_TRANSFER = 'BANK_TRANSFER';
+    public const PAYMENT_METHOD_E_WALLET = 'E_WALLET';
 
     public const STATUS_PENDING = 'PENDING';
+    public const STATUS_CONFIRMED = 'CONFIRMED';
+    public const STATUS_PACKED = 'PACKED';
+    public const STATUS_SHIPPED = 'SHIPPED';
+    public const STATUS_DELIVERED = 'DELIVERED';
+    public const STATUS_CANCELLED = 'CANCELLED';
 
     /**
      * The attributes that are mass assignable.
@@ -47,6 +54,33 @@ class Order extends Model
             'total_amount' => 'decimal:2',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function allowedStatuses(): array
+    {
+        return [
+            self::STATUS_PENDING,
+            self::STATUS_CONFIRMED,
+            self::STATUS_PACKED,
+            self::STATUS_SHIPPED,
+            self::STATUS_DELIVERED,
+            self::STATUS_CANCELLED,
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function allowedPaymentMethods(): array
+    {
+        return [
+            self::PAYMENT_METHOD_COD,
+            self::PAYMENT_METHOD_BANK_TRANSFER,
+            self::PAYMENT_METHOD_E_WALLET,
         ];
     }
 
