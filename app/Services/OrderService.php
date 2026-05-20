@@ -42,6 +42,40 @@ class OrderService
         Payment::STATUS_REFUNDED => [],
     ];
 
+    /**
+     * @var array<string, array{status:string, success_message:string}>
+     */
+    private const BULK_ACTIONS = [
+        'CONFIRM' => [
+            'status' => Order::STATUS_CONFIRMED,
+            'success_message' => 'Đã xác nhận đơn và trừ kho.',
+        ],
+        'PACK' => [
+            'status' => Order::STATUS_PACKED,
+            'success_message' => 'Đã chuyển đơn sang trạng thái đã đóng gói.',
+        ],
+        'SHIP' => [
+            'status' => Order::STATUS_SHIPPED,
+            'success_message' => 'Đã bàn giao đơn cho vận chuyển.',
+        ],
+        'DELIVER' => [
+            'status' => Order::STATUS_DELIVERED,
+            'success_message' => 'Đã đánh dấu giao hàng thành công.',
+        ],
+        'MARK_DELIVERY_FAILED' => [
+            'status' => Order::STATUS_DELIVERY_FAILED,
+            'success_message' => 'Đã đánh dấu giao hàng thất bại.',
+        ],
+        'CANCEL' => [
+            'status' => Order::STATUS_CANCELLED,
+            'success_message' => 'Đã hủy đơn hàng.',
+        ],
+        'RESHIP' => [
+            'status' => Order::STATUS_SHIPPED,
+            'success_message' => 'Đã chuyển đơn sang trạng thái giao lại.',
+        ],
+    ];
+
     public function checkout(User $user, array $attributes): Order
     {
         return DB::transaction(function () use ($user, $attributes): Order {
@@ -358,6 +392,10 @@ class OrderService
                 $this->deductStockIfNeeded($lockedOrder);
             }
 
+            if ($nextStatus === Order::STATUS_DELIVERED) {
+                $this->ensureOrderCanBeDelivered($lockedOrder);
+            }
+
             if ($nextStatus === Order::STATUS_CANCELLED) {
                 $this->cancelOrderByAdmin($lockedOrder, $actor, $currentStatus, $note, $options);
 
@@ -446,6 +484,89 @@ class OrderService
 
             return $this->findAdminOrder($lockedOrder->id) ?? $lockedOrder->fresh($this->orderRelations());
         });
+    }
+
+    /**
+     * @param list<int> $orderIds
+     * @return array<string, mixed>
+     */
+    public function bulkUpdateStatuses(User $actor, array $orderIds, string $action, ?string $note = null): array
+    {
+        $actionConfig = self::BULK_ACTIONS[$action] ?? null;
+
+        if (! $actionConfig) {
+            throw ValidationException::withMessages([
+                'action' => ['Thao tác hàng loạt không hợp lệ.'],
+            ]);
+        }
+
+        $results = [];
+        $successCount = 0;
+        $failedCount = 0;
+
+        foreach ($orderIds as $orderId) {
+            $order = $this->findAdminOrder($orderId);
+
+            if (! $order) {
+                $results[] = [
+                    'orderId' => $orderId,
+                    'orderNo' => null,
+                    'success' => false,
+                    'message' => 'Không tìm thấy đơn hàng.',
+                ];
+                $failedCount++;
+                continue;
+            }
+
+            try {
+                $options = [];
+                $actionNote = $note;
+
+                if ($action === 'CANCEL' && $order->status === Order::STATUS_DELIVERY_FAILED) {
+                    $options['restock_inventory'] = false;
+                    $actionNote = $note ?: 'Giao thất bại, hàng không đủ điều kiện nhập lại kho.';
+                }
+
+                $this->updateOrderStatus(
+                    $order,
+                    $actionConfig['status'],
+                    $actor,
+                    $actionNote,
+                    $options,
+                );
+
+                $results[] = [
+                    'orderId' => $order->id,
+                    'orderNo' => $order->order_no,
+                    'success' => true,
+                    'message' => $actionConfig['success_message'],
+                ];
+                $successCount++;
+            } catch (ValidationException $exception) {
+                $results[] = [
+                    'orderId' => $order->id,
+                    'orderNo' => $order->order_no,
+                    'success' => false,
+                    'message' => $this->validationMessage($exception),
+                ];
+                $failedCount++;
+            } catch (\Throwable $exception) {
+                $results[] = [
+                    'orderId' => $order->id,
+                    'orderNo' => $order->order_no,
+                    'success' => false,
+                    'message' => 'Không thể xử lý đơn hàng này lúc này.',
+                ];
+                $failedCount++;
+            }
+        }
+
+        return [
+            'total' => count($orderIds),
+            'success' => $successCount,
+            'failed' => $failedCount,
+            'results' => $results,
+        ];
     }
 
     /**
@@ -726,6 +847,26 @@ class OrderService
         }
     }
 
+    private function ensureOrderCanBeDelivered(Order $order): void
+    {
+        $payment = $order->payment;
+
+        if (! $payment) {
+            throw ValidationException::withMessages([
+                'payment' => ['Đơn hàng chưa có bản ghi thanh toán.'],
+            ]);
+        }
+
+        if (
+            $order->payment_method === Order::PAYMENT_METHOD_BANK_TRANSFER
+            && $payment->payment_status !== Payment::STATUS_SUCCESS
+        ) {
+            throw ValidationException::withMessages([
+                'payment_status' => ['Đơn chuyển khoản chỉ được đánh dấu giao thành công khi đã xác nhận thanh toán.'],
+            ]);
+        }
+    }
+
     private function deductStockIfNeeded(Order $order): void
     {
         if ($order->stock_deducted) {
@@ -910,6 +1051,18 @@ class OrderService
         }
 
         return $baseNote . ' Ghi chú: ' . $note;
+    }
+
+    private function validationMessage(ValidationException $exception): string
+    {
+        $errors = $exception->errors();
+        $firstErrorGroup = reset($errors);
+
+        if (is_array($firstErrorGroup) && isset($firstErrorGroup[0]) && is_string($firstErrorGroup[0])) {
+            return $firstErrorGroup[0];
+        }
+
+        return 'Dữ liệu cập nhật không hợp lệ.';
     }
 
     private function notifyCustomerAboutOrderStatus(Order $order, string $fromStatus, string $toStatus): void

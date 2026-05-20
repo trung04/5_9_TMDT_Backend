@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\OrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
 {
@@ -125,6 +126,38 @@ class OrderController extends Controller
         return response()->json([
             'message' => 'Payment status updated successfully.',
             'data' => $this->orderService->orderDetailPayload($updatedOrder),
+        ]);
+    }
+
+    public function bulkUpdateStatus(Request $request): JsonResponse
+    {
+        if ($response = $this->ensureAdmin($request)) {
+            return $response;
+        }
+
+        $validated = $request->validate([
+            'orderIds' => ['required', 'array', 'min:1'],
+            'orderIds.*' => ['integer', 'distinct', 'min:1'],
+            'action' => [
+                'required',
+                'string',
+                Rule::in(['CONFIRM', 'PACK', 'SHIP', 'DELIVER', 'MARK_DELIVERY_FAILED', 'CANCEL', 'RESHIP']),
+            ],
+            'note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        /** @var User $user */
+        $user = $request->user();
+        $result = $this->orderService->bulkUpdateStatuses(
+            $user,
+            array_map('intval', $validated['orderIds']),
+            (string) $validated['action'],
+            ! empty($validated['note']) ? (string) $validated['note'] : null,
+        );
+
+        return response()->json([
+            'message' => 'Bulk order status processed.',
+            'data' => $result,
         ]);
     }
 }

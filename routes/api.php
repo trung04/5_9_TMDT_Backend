@@ -83,6 +83,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
         Route::get('/orders', [AdminOrderController::class, 'index']);
         Route::get('/orders/{order}', [AdminOrderController::class, 'show']);
+        Route::post('/orders/bulk-status', [AdminOrderController::class, 'bulkUpdateStatus']);
         Route::patch('/orders/{order}/status', [AdminOrderController::class, 'updateStatus']);
         Route::patch('/orders/{order}/payment-status', [AdminOrderController::class, 'updatePaymentStatus']);
     });
