@@ -59,7 +59,7 @@ class CartService
         return DB::transaction(function () use ($user, $productId, $quantity): Cart {
             if ($quantity <= 0) {
                 throw ValidationException::withMessages([
-                    'quantity' => ['The quantity must be greater than 0.'],
+                    'quantity' => ['Số lượng phải lớn hơn 0.'],
                 ]);
             }
 
@@ -81,7 +81,7 @@ class CartService
 
             if (! $product || ! $product->is_active) {
                 throw ValidationException::withMessages([
-                    'product_id' => ['The selected product is unavailable.'],
+                    'product_id' => ['Sản phẩm hiện không còn khả dụng.'],
                 ]);
             }
 
@@ -136,7 +136,7 @@ class CartService
 
             if (! $product || ! $product->is_active) {
                 throw ValidationException::withMessages([
-                    'product_id' => ['The selected product is unavailable.'],
+                    'product_id' => ['Sản phẩm hiện không còn khả dụng.'],
                 ]);
             }
 
@@ -205,19 +205,19 @@ class CartService
     {
         if (! $product->is_active) {
             throw ValidationException::withMessages([
-                'product_id' => ['The selected product is unavailable.'],
+                'product_id' => ['Sản phẩm hiện không còn khả dụng.'],
             ]);
         }
 
         if ($quantity <= 0) {
             throw ValidationException::withMessages([
-                'quantity' => ['The quantity must be greater than 0.'],
+                'quantity' => ['Số lượng phải lớn hơn 0.'],
             ]);
         }
 
         if ($product->stock_quantity < $quantity) {
             throw ValidationException::withMessages([
-                'quantity' => ['The requested quantity exceeds available stock.'],
+                'quantity' => ['Số lượng vượt quá tồn kho hiện có.'],
             ]);
         }
     }
@@ -253,6 +253,7 @@ class CartService
                 'sku' => $product->sku,
                 'name' => $product->name,
                 'description' => $product->description,
+                'image_url' => $product->image_url,
                 'sale_price' => $product->sale_price,
                 'stock_quantity' => $product->stock_quantity,
                 'is_active' => $product->is_active,

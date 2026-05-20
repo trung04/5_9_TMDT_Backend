@@ -21,6 +21,7 @@ class UpdateOrderStatusRequest extends FormRequest
         return [
             'status' => ['required', 'string', Rule::in(Order::allowedStatuses())],
             'note' => ['nullable', 'string', 'max:500'],
+            'restock_inventory' => ['nullable', 'boolean'],
         ];
     }
 }

@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('sku', 80)->unique();
             $table->string('name', 180);
             $table->text('description')->nullable();
+            $table->text('image_url')->nullable();
             $table->decimal('sale_price', 15, 2);
             $table->unsignedInteger('stock_quantity')->default(0);
             $table->boolean('is_active')->default(true);

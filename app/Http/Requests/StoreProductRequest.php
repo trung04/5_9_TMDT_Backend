@@ -22,6 +22,7 @@ class StoreProductRequest extends FormRequest
             'sku' => ['required', 'string', 'max:80', 'unique:products,sku'],
             'name' => ['required', 'string', 'max:180'],
             'description' => ['nullable', 'string'],
+            'image_url' => ['nullable', 'url', 'max:2048'],
             'sale_price' => ['required', 'numeric', 'min:0'],
             'stock_quantity' => ['required', 'integer', 'min:0'],
             'is_active' => ['nullable', 'boolean'],
@@ -47,6 +48,9 @@ class StoreProductRequest extends FormRequest
 
             'name.required' => 'Tên sản phẩm là bắt buộc.',
             'name.max' => 'Tên sản phẩm không được vượt quá 180 ký tự.',
+
+            'image_url.url' => 'Đường dẫn ảnh phải là URL hợp lệ.',
+            'image_url.max' => 'Đường dẫn ảnh không được vượt quá 2048 ký tự.',
 
             'sale_price.required' => 'Giá bán là bắt buộc.',
             'sale_price.numeric' => 'Giá bán phải là số.',

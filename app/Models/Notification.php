@@ -26,6 +26,8 @@ class Notification extends Model
         'read_at',
     ];
 
+    public const UPDATED_AT = null;
+
     protected function casts(): array
     {
         return [

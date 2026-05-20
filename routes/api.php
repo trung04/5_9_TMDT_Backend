@@ -63,6 +63,9 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/orders/checkout', [OrderController::class, 'checkout']);
     Route::get('/orders', [OrderController::class, 'index']);
     Route::get('/orders/{order}', [OrderController::class, 'show']);
+    Route::patch('/orders/{order}/cancel', [OrderController::class, 'cancel']);
+    Route::patch('/orders/{order}/bank-transfer-submitted', [OrderController::class, 'confirmBankTransferSubmitted']);
+    Route::patch('/orders/{order}/confirm-delivery', [OrderController::class, 'confirmDelivery']);
 
     Route::prefix('admin')->group(function (): void {
         Route::get('/dashboard', [AdminDashboardController::class, 'show']);

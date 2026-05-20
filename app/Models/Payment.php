@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Payment extends Model
 {
@@ -64,5 +65,13 @@ class Payment extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
+    }
+
+    /**
+     * Get the status history entries for this payment.
+     */
+    public function statusHistory(): HasMany
+    {
+        return $this->hasMany(PaymentStatusHistory::class)->orderBy('changed_at');
     }
 }

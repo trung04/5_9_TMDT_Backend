@@ -11,13 +11,13 @@ class Order extends Model
 {
     public const PAYMENT_METHOD_COD = 'COD';
     public const PAYMENT_METHOD_BANK_TRANSFER = 'BANK_TRANSFER';
-    public const PAYMENT_METHOD_E_WALLET = 'E_WALLET';
 
     public const STATUS_PENDING = 'PENDING';
     public const STATUS_CONFIRMED = 'CONFIRMED';
     public const STATUS_PACKED = 'PACKED';
     public const STATUS_SHIPPED = 'SHIPPED';
     public const STATUS_DELIVERED = 'DELIVERED';
+    public const STATUS_DELIVERY_FAILED = 'DELIVERY_FAILED';
     public const STATUS_CANCELLED = 'CANCELLED';
 
     /**
@@ -37,6 +37,13 @@ class Order extends Model
         'shipping_fee',
         'discount_amount',
         'total_amount',
+        'stock_deducted',
+        'stock_deducted_at',
+        'shipping_carrier',
+        'shipping_code',
+        'shipped_at',
+        'delivered_at',
+        'cancelled_at',
         'note',
     ];
 
@@ -52,6 +59,11 @@ class Order extends Model
             'shipping_fee' => 'decimal:2',
             'discount_amount' => 'decimal:2',
             'total_amount' => 'decimal:2',
+            'stock_deducted' => 'boolean',
+            'stock_deducted_at' => 'datetime',
+            'shipped_at' => 'datetime',
+            'delivered_at' => 'datetime',
+            'cancelled_at' => 'datetime',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
@@ -68,6 +80,7 @@ class Order extends Model
             self::STATUS_PACKED,
             self::STATUS_SHIPPED,
             self::STATUS_DELIVERED,
+            self::STATUS_DELIVERY_FAILED,
             self::STATUS_CANCELLED,
         ];
     }
@@ -80,7 +93,6 @@ class Order extends Model
         return [
             self::PAYMENT_METHOD_COD,
             self::PAYMENT_METHOD_BANK_TRANSFER,
-            self::PAYMENT_METHOD_E_WALLET,
         ];
     }
 
@@ -114,5 +126,13 @@ class Order extends Model
     public function statusHistory(): HasMany
     {
         return $this->hasMany(OrderStatusHistory::class)->orderBy('changed_at');
+    }
+
+    /**
+     * Get the payment status history entries for this order.
+     */
+    public function paymentStatusHistory(): HasMany
+    {
+        return $this->hasMany(PaymentStatusHistory::class)->orderBy('changed_at');
     }
 }

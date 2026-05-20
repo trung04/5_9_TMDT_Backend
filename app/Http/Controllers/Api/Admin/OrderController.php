@@ -86,6 +86,11 @@ class OrderController extends Controller
             (string) $request->input('status'),
             $user,
             $request->filled('note') ? (string) $request->input('note') : null,
+            [
+                'restock_inventory' => $request->has('restock_inventory')
+                    ? $request->boolean('restock_inventory')
+                    : null,
+            ],
         );
 
         return response()->json([

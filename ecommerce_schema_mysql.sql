@@ -117,6 +117,7 @@ CREATE TABLE IF NOT EXISTS `products` (
   `sku` VARCHAR(80) NOT NULL,
   `name` VARCHAR(180) NOT NULL,
   `description` TEXT NULL,
+  `image_url` TEXT NULL,
   `sale_price` DECIMAL(12,2) NOT NULL,
   `stock_quantity` INT UNSIGNED NOT NULL DEFAULT 0,
   `is_active` BOOLEAN NOT NULL DEFAULT TRUE,
@@ -484,4 +485,71 @@ CREATE TABLE IF NOT EXISTS `admin_settings` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_admin_settings_user_id_patch` (`user_id`),
   CONSTRAINT `fk_admin_settings_user_patch` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE `products`
+  ADD COLUMN IF NOT EXISTS `image_url` TEXT NULL AFTER `description`;
+
+
+
+
+ALTER TABLE orders
+ADD COLUMN stock_deducted BOOLEAN NOT NULL DEFAULT FALSE AFTER total_amount,
+ADD COLUMN stock_deducted_at DATETIME NULL AFTER stock_deducted,
+ADD COLUMN shipping_carrier VARCHAR(80) NULL AFTER stock_deducted_at,
+ADD COLUMN shipping_code VARCHAR(80) NULL AFTER shipping_carrier,
+ADD COLUMN shipped_at DATETIME NULL AFTER shipping_code,
+ADD COLUMN delivered_at DATETIME NULL AFTER shipped_at,
+ADD COLUMN cancelled_at DATETIME NULL AFTER delivered_at;
+
+ALTER TABLE orders
+MODIFY COLUMN status ENUM(
+  'PENDING',
+  'CONFIRMED',
+  'PACKED',
+  'SHIPPED',
+  'DELIVERED',
+  'DELIVERY_FAILED',
+  'CANCELLED'
+) NOT NULL DEFAULT 'PENDING';
+
+ALTER TABLE order_status_history
+MODIFY COLUMN from_status ENUM(
+  'PENDING',
+  'CONFIRMED',
+  'PACKED',
+  'SHIPPED',
+  'DELIVERED',
+  'DELIVERY_FAILED',
+  'CANCELLED'
+) NULL,
+MODIFY COLUMN to_status ENUM(
+  'PENDING',
+  'CONFIRMED',
+  'PACKED',
+  'SHIPPED',
+  'DELIVERED',
+  'DELIVERY_FAILED',
+  'CANCELLED'
+) NOT NULL;
+
+CREATE TABLE IF NOT EXISTS payment_status_history (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  payment_id BIGINT UNSIGNED NOT NULL,
+  order_id BIGINT UNSIGNED NOT NULL,
+  changed_by_user_id BIGINT UNSIGNED NULL,
+  from_status ENUM('PENDING','SUCCESS','FAILED','REFUNDED') NULL,
+  to_status ENUM('PENDING','SUCCESS','FAILED','REFUNDED') NOT NULL,
+  note VARCHAR(255) NULL,
+  changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_payment_status_history_payment_id (payment_id),
+  KEY idx_payment_status_history_order_id (order_id),
+  KEY idx_payment_status_history_changed_by_user_id (changed_by_user_id),
+  CONSTRAINT fk_payment_status_history_payment
+    FOREIGN KEY (payment_id) REFERENCES payments(id),
+  CONSTRAINT fk_payment_status_history_order
+    FOREIGN KEY (order_id) REFERENCES orders(id),
+  CONSTRAINT fk_payment_status_history_changed_by_user
+    FOREIGN KEY (changed_by_user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

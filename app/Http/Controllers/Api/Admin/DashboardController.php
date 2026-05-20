@@ -24,7 +24,11 @@ class DashboardController extends Controller
 
         return response()->json([
             'message' => 'Dashboard data retrieved successfully.',
-            'data' => $this->adminInsightService->dashboardPayload(),
+            'data' => $this->adminInsightService->dashboardPayload([
+                'date_from' => $request->query('date_from'),
+                'date_to' => $request->query('date_to'),
+                'chart_range' => $request->query('chart_range'),
+            ], $request->user()),
         ]);
     }
 }
