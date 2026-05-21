@@ -27,13 +27,17 @@ CREATE TABLE IF NOT EXISTS `users` (
   `reward_tier` VARCHAR(50) NOT NULL DEFAULT 'Bronze',
   `next_tier_points` INT UNSIGNED NOT NULL DEFAULT 500,
   `role` ENUM('CUSTOMER','ADMIN','WAREHOUSE_STAFF','SUPPLIER') NOT NULL,
+  `admin_role_id` BIGINT UNSIGNED NULL,
+  `created_by_admin_id` BIGINT UNSIGNED NULL,
   `status` ENUM('ACTIVE','INACTIVE','BLOCKED') NOT NULL DEFAULT 'ACTIVE',
   `is_active` BOOLEAN NOT NULL DEFAULT TRUE,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_users_email` (`email`),
-  UNIQUE KEY `uk_users_phone` (`phone`)
+  UNIQUE KEY `uk_users_phone` (`phone`),
+  KEY `idx_users_admin_role_id` (`admin_role_id`),
+  KEY `idx_users_created_by_admin_id` (`created_by_admin_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `password_reset_tokens` (
@@ -54,6 +58,52 @@ CREATE TABLE IF NOT EXISTS `sessions` (
   KEY `idx_sessions_user_id` (`user_id`),
   KEY `idx_sessions_last_activity` (`last_activity`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `admin_roles` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(120) NOT NULL,
+  `slug` VARCHAR(120) NOT NULL,
+  `description` TEXT NULL,
+  `is_super` BOOLEAN NOT NULL DEFAULT FALSE,
+  `is_system` BOOLEAN NOT NULL DEFAULT FALSE,
+  `created_by_admin_id` BIGINT UNSIGNED NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_admin_roles_slug` (`slug`),
+  KEY `idx_admin_roles_created_by_admin_id` (`created_by_admin_id`),
+  CONSTRAINT `fk_admin_roles_created_by_admin`
+    FOREIGN KEY (`created_by_admin_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `admin_permissions` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `key` VARCHAR(120) NOT NULL,
+  `name` VARCHAR(120) NOT NULL,
+  `group` VARCHAR(80) NOT NULL,
+  `description` TEXT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_admin_permissions_key` (`key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `admin_role_permission` (
+  `admin_role_id` BIGINT UNSIGNED NOT NULL,
+  `admin_permission_id` BIGINT UNSIGNED NOT NULL,
+  PRIMARY KEY (`admin_role_id`, `admin_permission_id`),
+  KEY `idx_admin_role_permission_permission_id` (`admin_permission_id`),
+  CONSTRAINT `fk_admin_role_permission_role`
+    FOREIGN KEY (`admin_role_id`) REFERENCES `admin_roles` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_admin_role_permission_permission`
+    FOREIGN KEY (`admin_permission_id`) REFERENCES `admin_permissions` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE `users`
+  ADD CONSTRAINT `fk_users_admin_role`
+    FOREIGN KEY (`admin_role_id`) REFERENCES `admin_roles` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_users_created_by_admin`
+    FOREIGN KEY (`created_by_admin_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS `cache` (
   `key` VARCHAR(255) NOT NULL,

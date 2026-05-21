@@ -208,7 +208,7 @@ class CartOrderApiTest extends TestCase
         $this->assertSame(1, $cartItem->quantity);
     }
 
-    public function test_checkout_creates_order_items_payment_history_and_updates_stock(): void
+    public function test_checkout_creates_order_items_payment_history_and_keeps_stock_until_confirmation(): void
     {
         [$user, $token] = $this->authenticateCustomer();
         $productA = $this->createProduct(price: 120.00, stock: 5);
@@ -246,7 +246,8 @@ class CartOrderApiTest extends TestCase
             ->assertJsonPath('data.payment_method', Order::PAYMENT_METHOD_COD)
             ->assertJsonPath('data.status', Order::STATUS_PENDING)
             ->assertJsonPath('data.subtotal', '320.00')
-            ->assertJsonPath('data.total_amount', '320.00')
+            ->assertJsonPath('data.shipping_fee', '20000.00')
+            ->assertJsonPath('data.total_amount', '20320.00')
             ->assertJsonPath('data.payment.payment_status', Payment::STATUS_PENDING)
             ->assertJsonPath('data.items.0.unit_price', '120.00')
             ->assertJsonPath('data.items.0.line_total', '240.00')
@@ -254,7 +255,7 @@ class CartOrderApiTest extends TestCase
             ->assertJsonPath('data.status_history.0.to_status', Order::STATUS_PENDING);
 
         $order = Order::query()->firstOrFail();
-        $this->assertSame(sprintf('ORD-%s%04d', now()->format('Y'), $order->id), $order->order_no);
+        $this->assertMatchesRegularExpression('/^ORD-\d{14}-\d{4}$/', $order->order_no);
         $this->assertDatabaseCount('order_items', 2);
         $this->assertDatabaseHas('payments', [
             'order_id' => $order->id,
@@ -271,8 +272,8 @@ class CartOrderApiTest extends TestCase
         $productB->refresh();
         $cart->refresh();
 
-        $this->assertSame(3, $productA->stock_quantity);
-        $this->assertSame(2, $productB->stock_quantity);
+        $this->assertSame(5, $productA->stock_quantity);
+        $this->assertSame(3, $productB->stock_quantity);
         $this->assertSame(Cart::STATUS_CHECKED_OUT, $cart->status);
     }
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AccountController;
+use App\Http\Controllers\Api\Admin\AccessController as AdminAccessController;
 use App\Http\Controllers\Api\Admin\CommunityController as AdminCommunityController;
 use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
@@ -73,6 +74,19 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('/community/invitations', [AdminCommunityController::class, 'storeInvitation']);
         Route::get('/settings', [AdminSettingsController::class, 'show']);
         Route::put('/settings', [AdminSettingsController::class, 'update']);
+
+        Route::prefix('access')->group(function (): void {
+            Route::get('/permissions', [AdminAccessController::class, 'permissions']);
+            Route::get('/roles', [AdminAccessController::class, 'roles']);
+            Route::post('/roles', [AdminAccessController::class, 'storeRole']);
+            Route::put('/roles/{role}', [AdminAccessController::class, 'updateRole']);
+            Route::delete('/roles/{role}', [AdminAccessController::class, 'destroyRole']);
+            Route::get('/admins', [AdminAccessController::class, 'admins']);
+            Route::post('/admins', [AdminAccessController::class, 'storeAdmin']);
+            Route::put('/admins/{admin}', [AdminAccessController::class, 'updateAdmin']);
+            Route::patch('/admins/{admin}/status', [AdminAccessController::class, 'updateAdminStatus']);
+            Route::patch('/admins/{admin}/password', [AdminAccessController::class, 'updateAdminPassword']);
+        });
 
         Route::get('/products', [AdminProductController::class, 'index']);
         Route::get('/products/{id}', [AdminProductController::class, 'show']);

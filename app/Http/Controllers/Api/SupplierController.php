@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\EnsuresAdminAccess;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SupplierRequest;
 use App\Models\Supplier;
@@ -11,6 +12,8 @@ use Illuminate\Http\Request;
 
 class SupplierController extends Controller
 {
+    use EnsuresAdminAccess;
+
     private SupplierService $supplierService;
 
     public function __construct(SupplierService $supplierService)
@@ -96,6 +99,10 @@ class SupplierController extends Controller
      */
     public function store(SupplierRequest $request): JsonResponse
     {
+        if ($response = $this->ensureAdmin($request, 'admin.suppliers.create')) {
+            return $response;
+        }
+
         $supplier = $this->supplierService->createSupplier($request->validated());
 
         return response()->json([
@@ -111,6 +118,10 @@ class SupplierController extends Controller
      */
     public function update(SupplierRequest $request, Supplier $supplier): JsonResponse
     {
+        if ($response = $this->ensureAdmin($request, 'admin.suppliers.update')) {
+            return $response;
+        }
+
         $updatedSupplier = $this->supplierService->updateSupplier(
             $supplier,
             $request->validated()
@@ -127,8 +138,12 @@ class SupplierController extends Controller
      *
      * @urlParam id int The supplier ID. Example: 1
      */
-    public function destroy(Supplier $supplier): JsonResponse
+    public function destroy(Request $request, Supplier $supplier): JsonResponse
     {
+        if ($response = $this->ensureAdmin($request, 'admin.suppliers.delete')) {
+            return $response;
+        }
+
         try {
             $this->supplierService->deleteSupplier($supplier);
 

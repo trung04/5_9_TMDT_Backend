@@ -18,7 +18,7 @@ class DashboardController extends Controller
 
     public function show(Request $request): JsonResponse
     {
-        if ($response = $this->ensureAdmin($request)) {
+        if ($response = $this->ensureAdmin($request, 'admin.dashboard.view')) {
             return $response;
         }
 

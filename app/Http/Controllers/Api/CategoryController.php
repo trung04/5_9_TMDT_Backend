@@ -70,7 +70,7 @@ class CategoryController extends Controller
      */
     public function store(CategoryRequest $request): JsonResponse
     {
-        if ($response = $this->ensureAdmin($request)) {
+        if ($response = $this->ensureAdmin($request, 'admin.categories.create')) {
             return $response;
         }
 
@@ -89,7 +89,7 @@ class CategoryController extends Controller
      */
     public function update(CategoryRequest $request, Category $category): JsonResponse
     {
-        if ($response = $this->ensureAdmin($request)) {
+        if ($response = $this->ensureAdmin($request, 'admin.categories.update')) {
             return $response;
         }
 
@@ -111,7 +111,7 @@ class CategoryController extends Controller
      */
     public function destroy(Request $request, Category $category): JsonResponse
     {
-        if ($response = $this->ensureAdmin($request)) {
+        if ($response = $this->ensureAdmin($request, 'admin.categories.delete')) {
             return $response;
         }
 

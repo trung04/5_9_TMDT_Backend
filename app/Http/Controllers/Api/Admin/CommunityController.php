@@ -20,7 +20,7 @@ class CommunityController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        if ($response = $this->ensureAdmin($request)) {
+        if ($response = $this->ensureAdmin($request, 'admin.community.view')) {
             return $response;
         }
 
@@ -32,7 +32,7 @@ class CommunityController extends Controller
 
     public function storeInvitation(StoreSupplierInvitationRequest $request): JsonResponse
     {
-        if ($response = $this->ensureAdmin($request)) {
+        if ($response = $this->ensureAdmin($request, 'admin.community.invitation.create')) {
             return $response;
         }
 

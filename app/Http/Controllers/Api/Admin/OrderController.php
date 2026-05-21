@@ -22,7 +22,7 @@ class OrderController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        if ($response = $this->ensureAdmin($request)) {
+        if ($response = $this->ensureAdmin($request, 'admin.orders.view')) {
             return $response;
         }
 
@@ -48,7 +48,7 @@ class OrderController extends Controller
 
     public function show(Request $request, int $order): JsonResponse
     {
-        if ($response = $this->ensureAdmin($request)) {
+        if ($response = $this->ensureAdmin($request, 'admin.orders.view')) {
             return $response;
         }
 
@@ -68,7 +68,7 @@ class OrderController extends Controller
 
     public function updateStatus(UpdateOrderStatusRequest $request, int $order): JsonResponse
     {
-        if ($response = $this->ensureAdmin($request)) {
+        if ($response = $this->ensureAdmin($request, 'admin.orders.status.update')) {
             return $response;
         }
 
@@ -102,7 +102,7 @@ class OrderController extends Controller
 
     public function updatePaymentStatus(UpdatePaymentStatusRequest $request, int $order): JsonResponse
     {
-        if ($response = $this->ensureAdmin($request)) {
+        if ($response = $this->ensureAdmin($request, 'admin.orders.payment.update')) {
             return $response;
         }
 
@@ -131,7 +131,7 @@ class OrderController extends Controller
 
     public function bulkUpdateStatus(Request $request): JsonResponse
     {
-        if ($response = $this->ensureAdmin($request)) {
+        if ($response = $this->ensureAdmin($request, 'admin.orders.bulk.update')) {
             return $response;
         }
 

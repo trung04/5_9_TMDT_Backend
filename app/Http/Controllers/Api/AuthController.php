@@ -121,7 +121,9 @@ class AuthController extends Controller
      */
     private function userData(User $user): array
     {
-        return Arr::only($user->toArray(), [
+        $user->loadMissing(['adminRole.permissions']);
+
+        $payload = Arr::only($user->toArray(), [
             'id',
             'full_name',
             'email',
@@ -132,5 +134,15 @@ class AuthController extends Controller
             'created_at',
             'updated_at',
         ]);
+
+        $payload['admin_role'] = $user->adminRole ? [
+            'id' => $user->adminRole->id,
+            'name' => $user->adminRole->name,
+            'slug' => $user->adminRole->slug,
+            'is_super' => (bool) $user->adminRole->is_super,
+        ] : null;
+        $payload['permissions'] = $user->adminPermissionKeys();
+
+        return $payload;
     }
 }

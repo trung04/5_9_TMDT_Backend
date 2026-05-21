@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -62,6 +63,8 @@ class User extends Authenticatable
         'reward_tier',
         'next_tier_points',
         'role',
+        'admin_role_id',
+        'created_by_admin_id',
         'status',
         'is_active',
     ];
@@ -101,6 +104,56 @@ class User extends Authenticatable
     public function canAuthenticate(): bool
     {
         return $this->status === self::STATUS_ACTIVE && $this->is_active;
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === self::ROLE_ADMIN;
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->isAdmin() && (bool) $this->adminRole?->is_super;
+    }
+
+    public function hasAdminPermission(string $permissionKey): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        if (! $this->isAdmin() || ! $this->adminRole) {
+            return false;
+        }
+
+        return $this->adminRole->permissions->contains('key', $permissionKey);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function adminPermissionKeys(): array
+    {
+        if (! $this->isAdmin()) {
+            return [];
+        }
+
+        if ($this->isSuperAdmin()) {
+            return collect(config('admin_access.permissions', []))
+                ->pluck('key')
+                ->filter()
+                ->values()
+                ->all();
+        }
+
+        if (! $this->adminRole) {
+            return [];
+        }
+
+        return $this->adminRole->permissions
+            ->pluck('key')
+            ->values()
+            ->all();
     }
 
     /**
@@ -155,6 +208,21 @@ class User extends Authenticatable
     public function adminSetting(): HasOne
     {
         return $this->hasOne(AdminSetting::class);
+    }
+
+    public function adminRole(): BelongsTo
+    {
+        return $this->belongsTo(AdminRole::class);
+    }
+
+    public function createdByAdmin(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'created_by_admin_id');
+    }
+
+    public function createdAdminAccounts(): HasMany
+    {
+        return $this->hasMany(self::class, 'created_by_admin_id');
     }
 
     public function createdSupplierInvitations(): HasMany

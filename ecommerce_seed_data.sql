@@ -20,6 +20,9 @@ TRUNCATE TABLE `inventory_items`;
 TRUNCATE TABLE `notifications`;
 TRUNCATE TABLE `wishlist_items`;
 TRUNCATE TABLE `admin_settings`;
+TRUNCATE TABLE `admin_role_permission`;
+TRUNCATE TABLE `admin_permissions`;
+TRUNCATE TABLE `admin_roles`;
 TRUNCATE TABLE `personal_access_tokens`;
 TRUNCATE TABLE `password_reset_tokens`;
 TRUNCATE TABLE `sessions`;
@@ -48,6 +51,37 @@ INSERT INTO `users` (`id`, `full_name`, `email`, `phone`, `password_hash`, `addr
 (6, 'Active User', 'active@example.com', '0901111111', '$2y$10$ce7ubt0LylfseDirp.DoN.HGxACLy6f7VekTno./rqHKJOOA6zuKq', '1 Trần Phú', 'Đà Nẵng', NULL, NULL, FALSE, FALSE, TRUE, TRUE, 0, 'Bronze', 500, 'CUSTOMER', 'ACTIVE', TRUE, '2026-01-06 08:00:00', '2026-01-06 08:00:00'),
 (7, 'Blocked User', 'blocked@example.com', '0902222222', '$2y$10$ce7ubt0LylfseDirp.DoN.HGxACLy6f7VekTno./rqHKJOOA6zuKq', NULL, NULL, NULL, NULL, FALSE, FALSE, TRUE, TRUE, 0, 'Bronze', 500, 'CUSTOMER', 'BLOCKED', TRUE, '2026-01-06 08:05:00', '2026-01-06 08:05:00'),
 (8, 'Inactive User', 'inactive@example.com', '0903333333', '$2y$10$ce7ubt0LylfseDirp.DoN.HGxACLy6f7VekTno./rqHKJOOA6zuKq', NULL, NULL, NULL, NULL, FALSE, FALSE, TRUE, TRUE, 0, 'Bronze', 500, 'CUSTOMER', 'INACTIVE', TRUE, '2026-01-06 08:10:00', '2026-01-06 08:10:00');
+
+INSERT INTO `admin_roles` (`id`, `name`, `slug`, `description`, `is_super`, `is_system`, `created_by_admin_id`, `created_at`, `updated_at`) VALUES
+(1, 'Super Admin', 'super_admin', 'System role with unrestricted admin access.', TRUE, TRUE, NULL, '2026-01-01 08:00:00', '2026-01-01 08:00:00');
+
+INSERT INTO `admin_permissions` (`id`, `key`, `name`, `group`, `description`, `created_at`, `updated_at`) VALUES
+(1, 'admin.dashboard.view', 'View dashboard', 'Dashboard', 'View admin dashboard metrics and queues.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(2, 'admin.community.view', 'View community', 'Community', 'View community and supplier invitation data.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(3, 'admin.community.invitation.create', 'Create supplier invitations', 'Community', 'Create supplier invitation records.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(4, 'admin.settings.view', 'View admin settings', 'Settings', 'View admin settings for the current account.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(5, 'admin.settings.update', 'Update admin settings', 'Settings', 'Update admin settings for the current account.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(6, 'admin.products.view', 'View products', 'Catalog', 'View products in the admin catalog.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(7, 'admin.products.create', 'Create products', 'Catalog', 'Create products in the admin catalog.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(8, 'admin.products.update', 'Update products', 'Catalog', 'Update products and product status.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(9, 'admin.products.delete', 'Delete products', 'Catalog', 'Delete products when no related data exists.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(10, 'admin.categories.create', 'Create categories', 'Catalog', 'Create catalog categories.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(11, 'admin.categories.update', 'Update categories', 'Catalog', 'Update catalog categories.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(12, 'admin.categories.delete', 'Delete categories', 'Catalog', 'Delete catalog categories.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(13, 'admin.suppliers.create', 'Create suppliers', 'Catalog', 'Create supplier records.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(14, 'admin.suppliers.update', 'Update suppliers', 'Catalog', 'Update supplier records.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(15, 'admin.suppliers.delete', 'Delete suppliers', 'Catalog', 'Delete or deactivate supplier records.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(16, 'admin.orders.view', 'View orders', 'Orders', 'View admin order lists and order details.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(17, 'admin.orders.status.update', 'Update order status', 'Orders', 'Update fulfillment status for orders.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(18, 'admin.orders.payment.update', 'Update payment status', 'Orders', 'Update payment status for orders.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(19, 'admin.orders.bulk.update', 'Bulk update orders', 'Orders', 'Run bulk order status actions.', '2026-01-01 08:00:00', '2026-01-01 08:00:00');
+
+INSERT INTO `admin_role_permission` (`admin_role_id`, `admin_permission_id`) VALUES
+(1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10), (1, 11), (1, 12), (1, 13), (1, 14), (1, 15), (1, 16), (1, 17), (1, 18), (1, 19);
+
+UPDATE `users`
+SET `admin_role_id` = 1
+WHERE `email` = 'admin@shop.local' AND `role` = 'ADMIN';
 
 INSERT INTO `user_addresses` (`id`, `user_id`, `label`, `recipient`, `phone`, `line1`, `city`, `note`, `is_default`, `created_at`, `updated_at`) VALUES
 (1, 2, 'Nhà riêng', 'Trần Thị Customer', '0900000002', '101 Lê Duẩn', 'Hà Nội', 'Giao sau 18h nếu có thể.', TRUE, '2026-01-03 09:00:00', '2026-01-03 09:00:00'),
@@ -235,6 +269,8 @@ END
 WHERE `id` IN (1, 2, 3, 4, 5, 6);
 
 ALTER TABLE `users` AUTO_INCREMENT = 9;
+ALTER TABLE `admin_roles` AUTO_INCREMENT = 2;
+ALTER TABLE `admin_permissions` AUTO_INCREMENT = 20;
 ALTER TABLE `categories` AUTO_INCREMENT = 5;
 ALTER TABLE `suppliers` AUTO_INCREMENT = 5;
 ALTER TABLE `inventories` AUTO_INCREMENT = 3;

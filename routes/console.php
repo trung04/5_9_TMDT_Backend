@@ -1,6 +1,7 @@
 <?php
 
 use App\Support\MySqlScriptRunner;
+use Database\Seeders\AdminAccessSeeder;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 
@@ -32,6 +33,10 @@ Artisan::command('app:import-ecommerce-mysql {--schema=ecommerce_schema_mysql.sq
     /** @var MySqlScriptRunner $runner */
     $runner = app(MySqlScriptRunner::class);
     $runner->import($schemaPath, $seedPath, $config);
+    $this->call('db:seed', [
+        '--class' => AdminAccessSeeder::class,
+        '--force' => true,
+    ]);
 
     $this->components->info("Imported schema and seed into MySQL database [{$config['database']}].");
     $this->line("Schema: {$schemaPath}");
