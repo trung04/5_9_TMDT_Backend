@@ -1,10 +1,9 @@
-
-
 SET NAMES utf8mb4;
--- USE `ecommerce_db`;
+USE `ecommerce_db`;
 
 SET FOREIGN_KEY_CHECKS = 0;
 
+TRUNCATE TABLE `payment_status_history`;
 TRUNCATE TABLE `reviews`;
 TRUNCATE TABLE `complaints`;
 TRUNCATE TABLE `supplier_invitations`;
@@ -19,6 +18,16 @@ TRUNCATE TABLE `supply_order_items`;
 TRUNCATE TABLE `supply_orders`;
 TRUNCATE TABLE `inventory_items`;
 TRUNCATE TABLE `notifications`;
+TRUNCATE TABLE `wishlist_items`;
+TRUNCATE TABLE `admin_settings`;
+TRUNCATE TABLE `personal_access_tokens`;
+TRUNCATE TABLE `password_reset_tokens`;
+TRUNCATE TABLE `sessions`;
+TRUNCATE TABLE `cache_locks`;
+TRUNCATE TABLE `cache`;
+TRUNCATE TABLE `failed_jobs`;
+TRUNCATE TABLE `job_batches`;
+TRUNCATE TABLE `jobs`;
 TRUNCATE TABLE `orders`;
 TRUNCATE TABLE `carts`;
 TRUNCATE TABLE `prices`;
@@ -31,14 +40,14 @@ TRUNCATE TABLE `users`;
 SET FOREIGN_KEY_CHECKS = 1;
 
 INSERT INTO `users` (`id`, `full_name`, `email`, `phone`, `password_hash`, `address`, `city`, `favorite_region`, `avatar_url`, `newsletter`, `sms_alerts`, `order_email`, `security_alerts`, `reward_points`, `reward_tier`, `next_tier_points`, `role`, `status`, `is_active`, `created_at`, `updated_at`) VALUES
-(1, 'Nguyễn Văn Admin', 'admin@shop.local', '0900000001', '$2y$10$FhHMK0IzDB8ZxIYG5OkLG.vVrOHkZlhnAnL9xICDXh1/l.q.Egg0y', '12 Nguyễn Huệ', 'Hà Nội', 'Tây Bắc', NULL, FALSE, FALSE, TRUE, TRUE, 0, 'Bronze', 500, 'ADMIN', 'ACTIVE', TRUE, '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
-(2, 'Trần Thị Customer', 'customer1@shop.local', '0900000002', '$2y$10$FhHMK0IzDB8ZxIYG5OkLG.vVrOHkZlhnAnL9xICDXh1/l.q.Egg0y', '101 Lê Duẩn', 'Hà Nội', 'Đông Bắc', NULL, TRUE, TRUE, TRUE, TRUE, 720, 'Silver', 1000, 'CUSTOMER', 'ACTIVE', TRUE, '2026-01-02 09:00:00', '2026-01-02 09:00:00'),
-(3, 'Lê Văn Kho', 'warehouse@shop.local', '0900000003', '$2y$10$warehousehashdemo00000000000000000000000000000000000', 'KCN Bắc Từ Liêm', 'Hà Nội', NULL, NULL, FALSE, TRUE, TRUE, TRUE, 0, 'Bronze', 500, 'WAREHOUSE_STAFF', 'ACTIVE', TRUE, '2026-01-03 10:00:00', '2026-01-03 10:00:00'),
-(4, 'Phạm Thị NCC', 'supplieruser@shop.local', '0900000004', '$2y$10$supplierhashdemo000000000000000000000000000000000000', '45 Võ Văn Tần', 'TP.HCM', NULL, NULL, FALSE, TRUE, TRUE, TRUE, 0, 'Bronze', 500, 'SUPPLIER', 'ACTIVE', TRUE, '2026-01-04 11:00:00', '2026-01-04 11:00:00'),
-(5, 'Đỗ Minh Khách', 'customer2@shop.local', '0900000005', '$2y$10$customerhashdemo2222222222222222222222222222222222222', '22 Điện Biên Phủ', 'TP.HCM', 'Nam Bộ', NULL, TRUE, FALSE, TRUE, TRUE, 340, 'Bronze', 500, 'CUSTOMER', 'ACTIVE', TRUE, '2026-01-05 12:00:00', '2026-01-05 12:00:00'),
-(6, 'Active User', 'active@example.com', '0901111111', '$2y$10$FhHMK0IzDB8ZxIYG5OkLG.vVrOHkZlhnAnL9xICDXh1/l.q.Egg0y', '1 Trần Phú', 'Đà Nẵng', NULL, NULL, FALSE, FALSE, TRUE, TRUE, 0, 'Bronze', 500, 'CUSTOMER', 'ACTIVE', TRUE, '2026-01-06 08:00:00', '2026-01-06 08:00:00'),
-(7, 'Blocked User', 'blocked@example.com', '0902222222', '$2y$10$V16cweZ4GbJErB4o5Ofpxe6l4XEcKLZObVq.c3HviLflPzjXHIdYC', NULL, NULL, NULL, NULL, FALSE, FALSE, TRUE, TRUE, 0, 'Bronze', 500, 'CUSTOMER', 'BLOCKED', TRUE, '2026-01-06 08:05:00', '2026-01-06 08:05:00'),
-(8, 'Inactive User', 'inactive@example.com', '0903333333', '$2y$10$vfS7C5p/ImE1xzQi7Mok9Odn4UxJwgYb7qkXmD1jqPhSbipqg.dES', NULL, NULL, NULL, NULL, FALSE, FALSE, TRUE, TRUE, 0, 'Bronze', 500, 'CUSTOMER', 'INACTIVE', TRUE, '2026-01-06 08:10:00', '2026-01-06 08:10:00');
+(1, 'Nguyễn Văn Admin', 'admin@shop.local', '0900000001', '$2y$10$ce7ubt0LylfseDirp.DoN.HGxACLy6f7VekTno./rqHKJOOA6zuKq', '12 Nguyễn Huệ', 'Hà Nội', 'Tây Bắc', NULL, FALSE, FALSE, TRUE, TRUE, 0, 'Bronze', 500, 'ADMIN', 'ACTIVE', TRUE, '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(2, 'Trần Thị Customer', 'customer1@shop.local', '0900000002', '$2y$10$ce7ubt0LylfseDirp.DoN.HGxACLy6f7VekTno./rqHKJOOA6zuKq', '101 Lê Duẩn', 'Hà Nội', 'Đông Bắc', NULL, TRUE, TRUE, TRUE, TRUE, 720, 'Silver', 1000, 'CUSTOMER', 'ACTIVE', TRUE, '2026-01-02 09:00:00', '2026-01-02 09:00:00'),
+(3, 'Lê Văn Kho', 'warehouse@shop.local', '0900000003', '$2y$10$ce7ubt0LylfseDirp.DoN.HGxACLy6f7VekTno./rqHKJOOA6zuKq', 'KCN Bắc Từ Liêm', 'Hà Nội', NULL, NULL, FALSE, TRUE, TRUE, TRUE, 0, 'Bronze', 500, 'WAREHOUSE_STAFF', 'ACTIVE', TRUE, '2026-01-03 10:00:00', '2026-01-03 10:00:00'),
+(4, 'Phạm Thị NCC', 'supplieruser@shop.local', '0900000004', '$2y$10$ce7ubt0LylfseDirp.DoN.HGxACLy6f7VekTno./rqHKJOOA6zuKq', '45 Võ Văn Tần', 'TP.HCM', NULL, NULL, FALSE, TRUE, TRUE, TRUE, 0, 'Bronze', 500, 'SUPPLIER', 'ACTIVE', TRUE, '2026-01-04 11:00:00', '2026-01-04 11:00:00'),
+(5, 'Đỗ Minh Khách', 'customer2@shop.local', '0900000005', '$2y$10$ce7ubt0LylfseDirp.DoN.HGxACLy6f7VekTno./rqHKJOOA6zuKq', '22 Điện Biên Phủ', 'TP.HCM', 'Nam Bộ', NULL, TRUE, FALSE, TRUE, TRUE, 340, 'Bronze', 500, 'CUSTOMER', 'ACTIVE', TRUE, '2026-01-05 12:00:00', '2026-01-05 12:00:00'),
+(6, 'Active User', 'active@example.com', '0901111111', '$2y$10$ce7ubt0LylfseDirp.DoN.HGxACLy6f7VekTno./rqHKJOOA6zuKq', '1 Trần Phú', 'Đà Nẵng', NULL, NULL, FALSE, FALSE, TRUE, TRUE, 0, 'Bronze', 500, 'CUSTOMER', 'ACTIVE', TRUE, '2026-01-06 08:00:00', '2026-01-06 08:00:00'),
+(7, 'Blocked User', 'blocked@example.com', '0902222222', '$2y$10$ce7ubt0LylfseDirp.DoN.HGxACLy6f7VekTno./rqHKJOOA6zuKq', NULL, NULL, NULL, NULL, FALSE, FALSE, TRUE, TRUE, 0, 'Bronze', 500, 'CUSTOMER', 'BLOCKED', TRUE, '2026-01-06 08:05:00', '2026-01-06 08:05:00'),
+(8, 'Inactive User', 'inactive@example.com', '0903333333', '$2y$10$ce7ubt0LylfseDirp.DoN.HGxACLy6f7VekTno./rqHKJOOA6zuKq', NULL, NULL, NULL, NULL, FALSE, FALSE, TRUE, TRUE, 0, 'Bronze', 500, 'CUSTOMER', 'INACTIVE', TRUE, '2026-01-06 08:10:00', '2026-01-06 08:10:00');
 
 INSERT INTO `user_addresses` (`id`, `user_id`, `label`, `recipient`, `phone`, `line1`, `city`, `note`, `is_default`, `created_at`, `updated_at`) VALUES
 (1, 2, 'Nhà riêng', 'Trần Thị Customer', '0900000002', '101 Lê Duẩn', 'Hà Nội', 'Giao sau 18h nếu có thể.', TRUE, '2026-01-03 09:00:00', '2026-01-03 09:00:00'),
@@ -77,15 +86,13 @@ INSERT INTO `products` (`id`, `category_id`, `supplier_id`, `sku`, `name`, `desc
 (5, 2, 3, 'BANH-SAMOSA-10', 'Bánh samosa truyền thống hộp 10 cái', 'Bánh chiên nhân đậm đà, thích hợp ăn nhẹ và đãi khách.', 99000.00, 60, TRUE, '2026-01-01 09:20:00', '2026-01-01 09:20:00'),
 (6, 3, 4, 'MAT-ONG-RUNG-500', 'Mật ong rừng nguyên chất 500ml', 'Mật ong nguyên chất màu hổ phách, vị ngọt thanh, thích hợp bồi bổ sức khỏe.', 390000.00, 20, TRUE, '2026-01-01 09:25:00', '2026-01-01 09:25:00');
 
-
 INSERT INTO `prices` (`id`, `product_id`, `supplier_id`, `cost_price`, `effective_from`, `effective_to`, `is_active`, `created_at`, `updated_at`) VALUES
 (1, 1, 1, 170000.00, '2026-01-01 09:30:00', NULL, TRUE, '2026-01-01 09:30:00', '2026-01-01 09:30:00'),
 (2, 2, 2, 235000.00, '2026-01-01 09:31:00', NULL, TRUE, '2026-01-01 09:31:00', '2026-01-01 09:31:00'),
 (3, 3, 1, 350000.00, '2026-01-01 09:32:00', NULL, TRUE, '2026-01-01 09:32:00', '2026-01-01 09:32:00'),
 (4, 4, 3, 135000.00, '2026-01-01 09:33:00', NULL, TRUE, '2026-01-01 09:33:00', '2026-01-01 09:33:00'),
-(5, 5, 3, 65000.00,  '2026-01-01 09:34:00', NULL, TRUE, '2026-01-01 09:34:00', '2026-01-01 09:34:00'),
+(5, 5, 3, 65000.00, '2026-01-01 09:34:00', NULL, TRUE, '2026-01-01 09:34:00', '2026-01-01 09:34:00'),
 (6, 6, 4, 300000.00, '2026-01-01 09:35:00', NULL, TRUE, '2026-01-01 09:35:00', '2026-01-01 09:35:00');
-
 
 INSERT INTO `carts` (`id`, `user_id`, `status`, `created_at`, `updated_at`) VALUES
 (1, 2, 'ACTIVE', '2026-02-01 10:00:00', '2026-02-01 10:00:00'),
@@ -96,12 +103,10 @@ INSERT INTO `cart_items` (`id`, `cart_id`, `product_id`, `quantity`, `unit_price
 (2, 1, 6, 1, 390000.00, 390000.00, '2026-02-01 10:06:00', '2026-02-01 10:06:00'),
 (3, 2, 4, 2, 189000.00, 378000.00, '2026-02-02 11:05:00', '2026-02-02 11:05:00');
 
-
-INSERT INTO `orders` (`id`, `user_id`, `order_no`, `recipient_name`, `recipient_phone`, `shipping_address`, `payment_method`, `status`, `subtotal`, `shipping_fee`, `discount_amount`, `total_amount`, `note`, `created_at`, `updated_at`) VALUES
-(1, 2, 'ORD-20260001', 'Trần Thị Customer', '0900000002', '101 Lê Duẩn, Hà Nội', 'COD', 'DELIVERED', 619000.00, 30000.00, 0.00, 649000.00, 'Giao giờ hành chính, đóng gói cẩn thận.', '2026-02-05 08:00:00', '2026-02-07 17:00:00'),
-(2, 5, 'ORD-20260002', 'Đỗ Minh Khách', '0900000005', '22 Điện Biên Phủ, TP.HCM', 'BANK_TRANSFER', 'PAID', 489000.00, 0.00, 30000.00, 459000.00, 'Khách đã chuyển khoản, đơn hàng làm quà tặng.', '2026-02-10 09:00:00', '2026-02-10 09:30:00'),
-(3, 2, 'ORD-20260003', 'Trần Thị Customer', '0900000002', '101 Lê Duẩn, Hà Nội', 'E_WALLET', 'SHIPPED', 388000.00, 25000.00, 13000.00, 400000.00, 'Giao nhanh trong ngày nếu kịp tuyến.', '2026-02-12 14:00:00', '2026-02-13 08:00:00');
-
+INSERT INTO `orders` (`id`, `user_id`, `order_no`, `recipient_name`, `recipient_phone`, `shipping_address`, `payment_method`, `status`, `subtotal`, `shipping_fee`, `discount_amount`, `total_amount`, `stock_deducted`, `stock_deducted_at`, `shipping_carrier`, `shipping_code`, `shipped_at`, `delivered_at`, `cancelled_at`, `note`, `created_at`, `updated_at`) VALUES
+(1, 2, 'ORD-20260001', 'Trần Thị Customer', '0900000002', '101 Lê Duẩn, Hà Nội', 'COD', 'DELIVERED', 619000.00, 30000.00, 0.00, 649000.00, TRUE, '2026-02-05 08:10:00', 'GHN', 'GHN-ORD-20260001', '2026-02-06 08:00:00', '2026-02-07 17:00:00', NULL, 'Giao giờ hành chính, đóng gói cẩn thận.', '2026-02-05 08:00:00', '2026-02-07 17:00:00'),
+(2, 5, 'ORD-20260002', 'Đỗ Minh Khách', '0900000005', '22 Điện Biên Phủ, TP.HCM', 'BANK_TRANSFER', 'CONFIRMED', 489000.00, 0.00, 30000.00, 459000.00, TRUE, '2026-02-10 09:30:00', NULL, NULL, NULL, NULL, NULL, 'Khách đã chuyển khoản, đơn hàng làm quà tặng.', '2026-02-10 09:00:00', '2026-02-10 09:30:00'),
+(3, 2, 'ORD-20260003', 'Trần Thị Customer', '0900000002', '101 Lê Duẩn, Hà Nội', 'COD', 'SHIPPED', 388000.00, 25000.00, 13000.00, 400000.00, TRUE, '2026-02-12 14:15:00', 'GHTK', 'GHTK-ORD-20260003', '2026-02-13 08:00:00', NULL, NULL, 'Giao nhanh trong ngày nếu kịp tuyến.', '2026-02-12 14:00:00', '2026-02-13 08:00:00');
 
 INSERT INTO `order_items` (`id`, `order_id`, `product_id`, `product_name_snapshot`, `quantity`, `unit_price`, `line_total`, `created_at`, `updated_at`) VALUES
 (1, 1, 1, 'Trà Tân Cương Thái Nguyên 200g', 1, 229000.00, 229000.00, '2026-02-05 08:05:00', '2026-02-05 08:05:00'),
@@ -118,18 +123,23 @@ INSERT INTO `order_status_history` (`id`, `order_id`, `changed_by_user_id`, `fro
 (4, 1, 3, 'PACKED', 'SHIPPED', 'Bàn giao đơn vị vận chuyển.', '2026-02-06 08:00:00'),
 (5, 1, 1, 'SHIPPED', 'DELIVERED', 'Giao thành công.', '2026-02-07 17:00:00'),
 (6, 2, 1, NULL, 'PENDING', 'Đơn hàng mới tạo.', '2026-02-10 09:00:00'),
-(7, 2, 1, 'PENDING', 'PAID', 'Đã nhận chuyển khoản.', '2026-02-10 09:30:00'),
+(7, 2, 1, 'PENDING', 'CONFIRMED', 'Đã xác nhận đơn sau khi nhận chuyển khoản.', '2026-02-10 09:30:00'),
 (8, 3, 1, NULL, 'PENDING', 'Đơn hàng mới tạo.', '2026-02-12 14:00:00'),
 (9, 3, 1, 'PENDING', 'CONFIRMED', 'Đã xác nhận đơn.', '2026-02-12 14:15:00'),
 (10, 3, 3, 'CONFIRMED', 'PACKED', 'Đã đóng gói.', '2026-02-12 17:00:00'),
 (11, 3, 3, 'PACKED', 'SHIPPED', 'Đã giao cho đối tác vận chuyển.', '2026-02-13 08:00:00');
 
-
 INSERT INTO `payments` (`id`, `order_id`, `transaction_code`, `payment_method`, `payment_status`, `amount`, `gateway_name`, `gateway_reference`, `paid_at`, `raw_payload`, `created_at`, `updated_at`) VALUES
 (1, 1, 'TXN-COD-20260001', 'COD', 'SUCCESS', 649000.00, NULL, NULL, '2026-02-07 17:00:00', JSON_OBJECT('collected_by', 'shipper', 'note', 'cash on delivery'), '2026-02-05 08:00:00', '2026-02-07 17:00:00'),
 (2, 2, 'TXN-BANK-20260002', 'BANK_TRANSFER', 'SUCCESS', 459000.00, 'VCB', 'VCB-REF-20260002', '2026-02-10 09:25:00', JSON_OBJECT('bank', 'VCB', 'confirmed', TRUE), '2026-02-10 09:00:00', '2026-02-10 09:25:00'),
-(3, 3, 'TXN-EWALLET-20260003', 'E_WALLET', 'PENDING', 400000.00, 'MoMo', 'MOMO-REF-20260003', NULL, JSON_OBJECT('gateway', 'MoMo', 'status', 'pending'), '2026-02-12 14:00:00', '2026-02-12 14:00:00');
+(3, 3, 'TXN-COD-20260003', 'COD', 'PENDING', 400000.00, NULL, NULL, NULL, JSON_OBJECT('instructions', 'Thanh toán tiền mặt khi đơn hàng được giao thành công.', 'status', 'pending_cod'), '2026-02-12 14:00:00', '2026-02-12 14:00:00');
 
+INSERT INTO `payment_status_history` (`id`, `payment_id`, `order_id`, `changed_by_user_id`, `from_status`, `to_status`, `note`, `changed_at`) VALUES
+(1, 1, 1, 2, NULL, 'PENDING', 'Khởi tạo trạng thái thanh toán khi khách đặt hàng.', '2026-02-05 08:00:00'),
+(2, 1, 1, 1, 'PENDING', 'SUCCESS', 'Tự động xác nhận thanh toán COD khi đơn đã giao thành công.', '2026-02-07 17:00:00'),
+(3, 2, 2, 5, NULL, 'PENDING', 'Khởi tạo trạng thái thanh toán khi khách đặt hàng.', '2026-02-10 09:00:00'),
+(4, 2, 2, 1, 'PENDING', 'SUCCESS', 'Đã nhận chuyển khoản.', '2026-02-10 09:25:00'),
+(5, 3, 3, 2, NULL, 'PENDING', 'Khởi tạo trạng thái thanh toán COD.', '2026-02-12 14:00:00');
 
 INSERT INTO `complaints` (`id`, `order_id`, `user_id`, `product_id`, `reason`, `content`, `image_url`, `status`, `resolution_note`, `resolved_by_user_id`, `resolved_at`, `created_at`, `updated_at`) VALUES
 (1, 1, 2, 6, 'Vỏ chai bị rò nhẹ', 'Khách phản ánh nắp chai mật ong có dấu hiệu rò nhẹ khi nhận hàng.', 'https://example.com/images/complaint-1.jpg', 'RESOLVED', 'Đã đổi sản phẩm mới cho khách.', 1, '2026-02-09 10:00:00', '2026-02-08 09:00:00', '2026-02-09 10:00:00'),
@@ -154,7 +164,6 @@ INSERT INTO `inventory_items` (`id`, `inventory_id`, `product_id`, `quantity_on_
 (11, 1, 6, 8, 3, 2, '2026-02-01 08:00:00', '2026-01-01 10:10:00', '2026-02-01 08:00:00'),
 (12, 2, 6, 12, 3, 2, '2026-02-01 08:30:00', '2026-01-01 10:11:00', '2026-02-01 08:30:00');
 
-
 INSERT INTO `supply_orders` (`id`, `supplier_id`, `order_no`, `status`, `expected_date`, `received_date`, `total_amount`, `created_by_user_id`, `created_at`, `updated_at`) VALUES
 (1, 1, 'SO-20260001', 'RECEIVED', '2026-01-20', '2026-01-19', 6900000.00, 3, '2026-01-15 09:00:00', '2026-01-19 16:00:00'),
 (2, 3, 'SO-20260002', 'CONFIRMED', '2026-02-20', NULL, 10050000.00, 3, '2026-02-14 09:30:00', '2026-02-14 10:00:00');
@@ -167,7 +176,6 @@ INSERT INTO `supply_order_items` (`id`, `supply_order_id`, `product_id`, `quanti
 (5, 2, 6, 6, 300000.00, 1800000.00, '2026-02-14 09:37:00', '2026-02-14 09:37:00'),
 (6, 2, 2, 1, 225000.00, 225000.00, '2026-02-14 09:38:00', '2026-02-14 09:38:00');
 
-
 INSERT INTO `notifications` (`id`, `user_id`, `title`, `message`, `channel`, `status`, `sent_at`, `read_at`, `created_at`) VALUES
 (1, 2, 'Đơn hàng đã giao', 'Đơn hàng ORD-20260001 đã được giao thành công.', 'SYSTEM', 'READ', '2026-02-07 17:05:00', '2026-02-07 17:20:00', '2026-02-07 17:05:00'),
 (2, 5, 'Xác nhận thanh toán', 'Hệ thống đã ghi nhận thanh toán cho đơn ORD-20260002.', 'EMAIL', 'SENT', '2026-02-10 09:35:00', NULL, '2026-02-10 09:30:00'),
@@ -178,37 +186,12 @@ INSERT INTO `delivery_requests` (`id`, `requested_by_user_id`, `product_id`, `re
 (2, 3, 5, 30, 'Cần bổ sung tồn kho bánh samosa cho chương trình khuyến mãi.', 'PENDING', NULL, '2026-02-14 10:35:00', '2026-02-14 10:35:00'),
 (3, 3, 3, 10, 'Trà thượng hạng cần nhập bổ sung trong tuần tới.', 'FULFILLED', 1, '2026-02-01 08:00:00', '2026-02-05 16:00:00');
 
-
-ALTER TABLE `categories` AUTO_INCREMENT = 5;
-ALTER TABLE `suppliers` AUTO_INCREMENT = 5;
-ALTER TABLE `inventories` AUTO_INCREMENT = 3;
-ALTER TABLE `products` AUTO_INCREMENT = 7;
-ALTER TABLE `prices` AUTO_INCREMENT = 7;
-ALTER TABLE `carts` AUTO_INCREMENT = 3;
-ALTER TABLE `orders` AUTO_INCREMENT = 4;
-ALTER TABLE `order_items` AUTO_INCREMENT = 7;
-ALTER TABLE `order_status_history` AUTO_INCREMENT = 12;
-ALTER TABLE `payments` AUTO_INCREMENT = 4;
-ALTER TABLE `complaints` AUTO_INCREMENT = 3;
-ALTER TABLE `reviews` AUTO_INCREMENT = 4;
-ALTER TABLE `inventory_items` AUTO_INCREMENT = 13;
-ALTER TABLE `supply_orders` AUTO_INCREMENT = 3;
-ALTER TABLE `supply_order_items` AUTO_INCREMENT = 7;
-ALTER TABLE `notifications` AUTO_INCREMENT = 4;
-ALTER TABLE `delivery_requests` AUTO_INCREMENT = 4;
-ALTER TABLE `cart_items` AUTO_INCREMENT = 4;
-
-
-
--- PHAN THEM: DU LIEU MAU BO SUNG CHO CAC BANG MOI
-
-
-INSERT IGNORE INTO `wishlist_items` (`id`, `user_id`, `product_id`, `created_at`, `updated_at`) VALUES
+INSERT INTO `wishlist_items` (`id`, `user_id`, `product_id`, `created_at`, `updated_at`) VALUES
 (1, 2, 1, '2026-02-14 09:00:00', '2026-02-14 09:00:00'),
 (2, 2, 6, '2026-02-14 09:05:00', '2026-02-14 09:05:00'),
 (3, 5, 3, '2026-02-14 09:10:00', '2026-02-14 09:10:00');
 
-INSERT IGNORE INTO `admin_settings` (
+INSERT INTO `admin_settings` (
   `id`,
   `user_id`,
   `store_name`,
@@ -239,12 +222,6 @@ INSERT IGNORE INTO `admin_settings` (
   '2026-02-14 09:15:00'
 );
 
-ALTER TABLE `wishlist_items` AUTO_INCREMENT = 4;
-ALTER TABLE `admin_settings` AUTO_INCREMENT = 2;
-
-ALTER TABLE `products`
-  ADD COLUMN IF NOT EXISTS `image_url` TEXT NULL AFTER `description`;
-
 UPDATE `products`
 SET `image_url` = CASE `id`
   WHEN 1 THEN 'https://lh3.googleusercontent.com/aida-public/AB6AXuApEI8i5c5-lvSG4Dlzqoz_ycN0juCHIwgJu3FfozzIkOyIxQ9ptojAza2j8UI8hasmu7TOlgionfq-cY3H6PlEL8ywo7Q9ShEQzH3cLKFRf8Dni86n_WyOFH8nGRQG2nzf-wYHGbnmtVeIrVo6FoEtT4R5xELI2ROxWdoUp_rn8TYN8mY9qqAYcT6LXQWlZ1LhaniJBZQAaNAsEJ5jQH2O4pELA7gdA392tj2seqHbnk4X5_jOuW0CE3KuGtJwvRGuED9r7cA_DWY'
@@ -256,3 +233,26 @@ SET `image_url` = CASE `id`
   ELSE `image_url`
 END
 WHERE `id` IN (1, 2, 3, 4, 5, 6);
+
+ALTER TABLE `users` AUTO_INCREMENT = 9;
+ALTER TABLE `categories` AUTO_INCREMENT = 5;
+ALTER TABLE `suppliers` AUTO_INCREMENT = 5;
+ALTER TABLE `inventories` AUTO_INCREMENT = 3;
+ALTER TABLE `products` AUTO_INCREMENT = 7;
+ALTER TABLE `prices` AUTO_INCREMENT = 7;
+ALTER TABLE `carts` AUTO_INCREMENT = 3;
+ALTER TABLE `orders` AUTO_INCREMENT = 4;
+ALTER TABLE `order_items` AUTO_INCREMENT = 7;
+ALTER TABLE `order_status_history` AUTO_INCREMENT = 12;
+ALTER TABLE `payments` AUTO_INCREMENT = 4;
+ALTER TABLE `payment_status_history` AUTO_INCREMENT = 6;
+ALTER TABLE `complaints` AUTO_INCREMENT = 3;
+ALTER TABLE `reviews` AUTO_INCREMENT = 4;
+ALTER TABLE `inventory_items` AUTO_INCREMENT = 13;
+ALTER TABLE `supply_orders` AUTO_INCREMENT = 3;
+ALTER TABLE `supply_order_items` AUTO_INCREMENT = 7;
+ALTER TABLE `notifications` AUTO_INCREMENT = 4;
+ALTER TABLE `delivery_requests` AUTO_INCREMENT = 4;
+ALTER TABLE `cart_items` AUTO_INCREMENT = 4;
+ALTER TABLE `wishlist_items` AUTO_INCREMENT = 4;
+ALTER TABLE `admin_settings` AUTO_INCREMENT = 2;
