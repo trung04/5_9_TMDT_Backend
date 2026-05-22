@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Api\Concerns\EnsuresAdminAccess;
+use App\Http\Controllers\Api\Concerns\PaginatesApiResults;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SupplierRequest;
 use App\Models\Supplier;
@@ -13,6 +14,7 @@ use Illuminate\Http\Request;
 class SupplierController extends Controller
 {
     use EnsuresAdminAccess;
+    use PaginatesApiResults;
 
     private SupplierService $supplierService;
 
@@ -29,19 +31,9 @@ class SupplierController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $perPage = $request->query('per_page', 15);
-        $suppliers = $this->supplierService->getAllSuppliers($perPage);
+        $suppliers = $this->supplierService->getAllSuppliers($this->perPage($request));
 
-        return response()->json([
-            'message' => 'Suppliers retrieved successfully.',
-            'data' => $suppliers->items(),
-            'pagination' => [
-                'total' => $suppliers->total(),
-                'per_page' => $suppliers->perPage(),
-                'current_page' => $suppliers->currentPage(),
-                'last_page' => $suppliers->lastPage(),
-            ],
-        ]);
+        return response()->json($suppliers);
     }
 
     /**
@@ -57,23 +49,11 @@ class SupplierController extends Controller
             return $response;
         }
 
-        $perPage = (int) $request->query('per_page', 100);
-        $perPage = min(max($perPage, 1), 200);
-
         $suppliers = Supplier::query()
             ->orderByDesc('id')
-            ->paginate($perPage);
+            ->paginate($this->perPage($request));
 
-        return response()->json([
-            'message' => 'Admin suppliers retrieved successfully.',
-            'data' => $suppliers->items(),
-            'pagination' => [
-                'total' => $suppliers->total(),
-                'per_page' => $suppliers->perPage(),
-                'current_page' => $suppliers->currentPage(),
-                'last_page' => $suppliers->lastPage(),
-            ],
-        ]);
+        return response()->json($suppliers);
     }
 
     /**
@@ -111,19 +91,9 @@ class SupplierController extends Controller
             ], 404);
         }
 
-        $perPage = $request->query('per_page', 15);
-        $products = $this->supplierService->getProductsBySupplier($supplier->id, $perPage);
+        $products = $this->supplierService->getProductsBySupplier($supplier->id, $this->perPage($request));
 
-        return response()->json([
-            'message' => 'Supplier products retrieved successfully.',
-            'data' => $products->items(),
-            'pagination' => [
-                'total' => $products->total(),
-                'per_page' => $products->perPage(),
-                'current_page' => $products->currentPage(),
-                'last_page' => $products->lastPage(),
-            ],
-        ]);
+        return response()->json($products);
     }
 
     /**

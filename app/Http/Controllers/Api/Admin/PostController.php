@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Api\Concerns\EnsuresAdminAccess;
+use App\Http\Controllers\Api\Concerns\PaginatesApiResults;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StorePostRequest;
 use App\Http\Requests\Admin\UpdatePostCommentVisibilityRequest;
@@ -17,6 +18,7 @@ use Illuminate\Support\Carbon;
 class PostController extends Controller
 {
     use EnsuresAdminAccess;
+    use PaginatesApiResults;
 
     public function index(Request $request): JsonResponse
     {
@@ -32,12 +34,11 @@ class PostController extends Controller
             ])
             ->withCount(['likes', 'comments'])
             ->orderByDesc('created_at')
-            ->get();
+            ->paginate($this->perPage($request));
 
-        return response()->json([
-            'message' => 'Admin posts retrieved successfully.',
-            'data' => $posts->map(fn (Post $post): array => $this->postPayload($post))->values(),
-        ]);
+        return response()->json(
+            $this->transformPaginator($posts, fn (Post $post): array => $this->postPayload($post))
+        );
     }
 
     public function store(StorePostRequest $request): JsonResponse

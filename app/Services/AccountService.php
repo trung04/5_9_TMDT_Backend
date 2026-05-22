@@ -10,6 +10,7 @@ use App\Models\RewardRedemption;
 use App\Models\User;
 use App\Models\UserAddress;
 use App\Models\WishlistItem;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -159,13 +160,19 @@ class AccountService
         });
     }
 
-    public function listNotifications(User $user): array
+    public function listNotifications(User $user, int $perPage = 15): LengthAwarePaginator
     {
-        return $user->notifications()
+        $notifications = $user->notifications()
             ->orderByDesc('created_at')
-            ->get()
-            ->map(fn (Notification $notification): array => $this->notificationPayload($notification))
-            ->all();
+            ->paginate($perPage);
+
+        $notifications->setCollection(
+            $notifications->getCollection()
+                ->map(fn (Notification $notification): array => $this->notificationPayload($notification))
+                ->values()
+        );
+
+        return $notifications;
     }
 
     public function markNotificationRead(User $user, Notification $notification): Notification
@@ -184,15 +191,21 @@ class AccountService
         return $notification->refresh();
     }
 
-    public function listComplaints(User $user): array
+    public function listComplaints(User $user, int $perPage = 15): LengthAwarePaginator
     {
-        return Complaint::query()
+        $complaints = Complaint::query()
             ->where('user_id', $user->id)
             ->with(['order', 'product', 'resolver'])
             ->orderByDesc('created_at')
-            ->get()
-            ->map(fn (Complaint $complaint): array => $this->complaintPayload($complaint))
-            ->all();
+            ->paginate($perPage);
+
+        $complaints->setCollection(
+            $complaints->getCollection()
+                ->map(fn (Complaint $complaint): array => $this->complaintPayload($complaint))
+                ->values()
+        );
+
+        return $complaints;
     }
 
     public function createComplaint(User $user, array $attributes): Complaint

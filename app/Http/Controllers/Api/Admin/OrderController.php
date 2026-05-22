@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Api\Concerns\EnsuresAdminAccess;
+use App\Http\Controllers\Api\Concerns\PaginatesApiResults;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UpdatePaymentStatusRequest;
 use App\Http\Requests\Admin\UpdateOrderStatusRequest;
@@ -15,6 +16,7 @@ use Illuminate\Validation\Rule;
 class OrderController extends Controller
 {
     use EnsuresAdminAccess;
+    use PaginatesApiResults;
 
     public function __construct(private readonly OrderService $orderService)
     {
@@ -26,24 +28,17 @@ class OrderController extends Controller
             return $response;
         }
 
-        $perPage = min(max((int) $request->query('per_page', 15), 1), 100);
         $orders = $this->orderService->listAdminOrders([
             'status' => $request->query('status'),
             'keyword' => $request->query('keyword'),
-        ], $perPage);
+        ], $this->perPage($request));
 
-        return response()->json([
-            'message' => 'Orders retrieved successfully.',
-            'data' => $orders->getCollection()->map(
+        return response()->json(
+            $this->transformPaginator(
+                $orders,
                 fn ($order): array => $this->orderService->orderSummaryPayload($order)
-            )->values()->all(),
-            'pagination' => [
-                'total' => $orders->total(),
-                'per_page' => $orders->perPage(),
-                'current_page' => $orders->currentPage(),
-                'last_page' => $orders->lastPage(),
-            ],
-        ]);
+            )
+        );
     }
 
     public function show(Request $request, int $order): JsonResponse

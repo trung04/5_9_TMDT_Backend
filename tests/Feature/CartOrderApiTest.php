@@ -380,9 +380,9 @@ class CartOrderApiTest extends TestCase
         $response = $this->withToken($token)->getJson('/api/orders?per_page=1&page=1');
 
         $response->assertOk()
-            ->assertJsonPath('message', 'Orders retrieved successfully.')
-            ->assertJsonPath('pagination.total', 2)
-            ->assertJsonPath('pagination.per_page', 1)
+            ->assertJsonPath('total', 2)
+            ->assertJsonPath('per_page', 1)
+            ->assertJsonPath('current_page', 1)
             ->assertJsonCount(1, 'data');
 
         $returnedOrderId = $response->json('data.0.id');

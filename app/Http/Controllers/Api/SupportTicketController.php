@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\PaginatesApiResults;
 use App\Http\Controllers\Controller;
 use App\Models\SupportTicket;
 use Illuminate\Http\JsonResponse;
@@ -9,6 +10,8 @@ use Illuminate\Http\Request;
 
 class SupportTicketController extends Controller
 {
+    use PaginatesApiResults;
+
     public function index(Request $request): JsonResponse
     {
         $query = SupportTicket::query()
@@ -19,10 +22,12 @@ class SupportTicketController extends Controller
             $query->where('channel', strtoupper((string) $request->input('channel')));
         }
 
-        return response()->json([
-            'message' => 'Support tickets retrieved successfully.',
-            'data' => $query->get()->map(fn (SupportTicket $ticket): array => $this->ticketPayload($ticket))->values(),
-        ]);
+        return response()->json(
+            $this->transformPaginator(
+                $query->paginate($this->perPage($request)),
+                fn (SupportTicket $ticket): array => $this->ticketPayload($ticket)
+            )
+        );
     }
 
     public function store(Request $request): JsonResponse

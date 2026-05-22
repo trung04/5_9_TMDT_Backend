@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Api\Concerns\EnsuresAdminAccess;
+use App\Http\Controllers\Api\Concerns\PaginatesApiResults;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CategoryRequest;
 use App\Models\Category;
@@ -13,6 +14,7 @@ use Illuminate\Http\Request;
 class CategoryController extends Controller
 {
     use EnsuresAdminAccess;
+    use PaginatesApiResults;
 
     private CategoryService $categoryService;
 
@@ -29,19 +31,9 @@ class CategoryController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $perPage = $request->query('per_page', 15);
-        $categories = $this->categoryService->getAllCategories($perPage);
+        $categories = $this->categoryService->getAllCategories($this->perPage($request));
 
-        return response()->json([
-            'message' => 'Categories retrieved successfully.',
-            'data' => $categories->items(),
-            'pagination' => [
-                'total' => $categories->total(),
-                'per_page' => $categories->perPage(),
-                'current_page' => $categories->currentPage(),
-                'last_page' => $categories->lastPage(),
-            ],
-        ]);
+        return response()->json($categories);
     }
 
     /**
@@ -57,23 +49,11 @@ class CategoryController extends Controller
             return $response;
         }
 
-        $perPage = (int) $request->query('per_page', 100);
-        $perPage = min(max($perPage, 1), 200);
-
         $categories = Category::query()
             ->orderByDesc('id')
-            ->paginate($perPage);
+            ->paginate($this->perPage($request));
 
-        return response()->json([
-            'message' => 'Admin categories retrieved successfully.',
-            'data' => $categories->items(),
-            'pagination' => [
-                'total' => $categories->total(),
-                'per_page' => $categories->perPage(),
-                'current_page' => $categories->currentPage(),
-                'last_page' => $categories->lastPage(),
-            ],
-        ]);
+        return response()->json($categories);
     }
 
     /**
@@ -186,23 +166,10 @@ class CategoryController extends Controller
         $products = $this->categoryService->getProductsByCategory(
             $category->id,
             $filters,
-            $request->query('per_page', 15)
+            $this->perPage($request)
         );
 
-        return response()->json([
-            'message' => 'Products in category retrieved successfully.',
-            'category' => [
-                'id' => $category->id,
-                'name' => $category->name,
-            ],
-            'data' => $products->items(),
-            'pagination' => [
-                'total' => $products->total(),
-                'per_page' => $products->perPage(),
-                'current_page' => $products->currentPage(),
-                'last_page' => $products->lastPage(),
-            ],
-        ]);
+        return response()->json($products);
     }
 
     /**

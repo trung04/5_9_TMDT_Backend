@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Api\Concerns\EnsuresAdminAccess;
+use App\Http\Controllers\Api\Concerns\PaginatesApiResults;
 use App\Http\Controllers\Controller;
 use App\Models\AdminPermission;
 use App\Models\AdminRole;
@@ -18,6 +19,7 @@ use Illuminate\Validation\ValidationException;
 class AccessController extends Controller
 {
     use EnsuresAdminAccess;
+    use PaginatesApiResults;
 
     public function permissions(Request $request): JsonResponse
     {
@@ -159,12 +161,11 @@ class AccessController extends Controller
             ->where('role', User::ROLE_ADMIN)
             ->with(['adminRole', 'createdByAdmin'])
             ->orderByDesc('id')
-            ->get();
+            ->paginate($this->perPage($request));
 
-        return response()->json([
-            'message' => 'Admin accounts retrieved successfully.',
-            'data' => $admins->map(fn (User $admin): array => $this->adminPayload($admin))->values()->all(),
-        ]);
+        return response()->json(
+            $this->transformPaginator($admins, fn (User $admin): array => $this->adminPayload($admin))
+        );
     }
 
     public function storeAdmin(Request $request): JsonResponse

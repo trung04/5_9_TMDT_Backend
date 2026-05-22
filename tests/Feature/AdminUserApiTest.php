@@ -45,6 +45,8 @@ class AdminUserApiTest extends TestCase
 
         $this->withToken($token)->getJson('/api/admin/users')
             ->assertOk()
+            ->assertJsonPath('per_page', 15)
+            ->assertJsonPath('total', 1)
             ->assertJsonFragment(['email' => 'managed-customer@example.com']);
 
         $this->withToken($token)->putJson("/api/admin/users/{$customerId}", [

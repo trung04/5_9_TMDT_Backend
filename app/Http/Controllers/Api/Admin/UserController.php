@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Api\Concerns\EnsuresAdminAccess;
+use App\Http\Controllers\Api\Concerns\PaginatesApiResults;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -14,6 +15,7 @@ use Illuminate\Validation\Rule;
 class UserController extends Controller
 {
     use EnsuresAdminAccess;
+    use PaginatesApiResults;
 
     public function index(Request $request): JsonResponse
     {
@@ -21,28 +23,15 @@ class UserController extends Controller
             return $response;
         }
 
-        $perPage = (int) $request->query('per_page', 100);
-        $perPage = min(max($perPage, 1), 200);
-
         $users = User::query()
             ->where('role', User::ROLE_CUSTOMER)
             ->withCount('orders')
             ->orderByDesc('id')
-            ->paginate($perPage);
+            ->paginate($this->perPage($request));
 
-        return response()->json([
-            'message' => 'Admin users retrieved successfully.',
-            'data' => $users->getCollection()
-                ->map(fn (User $user): array => $this->customerPayload($user))
-                ->values()
-                ->all(),
-            'pagination' => [
-                'total' => $users->total(),
-                'per_page' => $users->perPage(),
-                'current_page' => $users->currentPage(),
-                'last_page' => $users->lastPage(),
-            ],
-        ]);
+        return response()->json(
+            $this->transformPaginator($users, fn (User $user): array => $this->customerPayload($user))
+        );
     }
 
     public function show(Request $request, User $user): JsonResponse

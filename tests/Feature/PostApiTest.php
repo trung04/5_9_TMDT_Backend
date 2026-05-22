@@ -24,6 +24,8 @@ class PostApiTest extends TestCase
         $response = $this->getJson('/api/posts');
 
         $response->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('per_page', 15)
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $published->id)
             ->assertJsonPath('data.0.title', 'Published post')

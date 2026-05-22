@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\PaginatesApiResults;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreComplaintRequest;
 use App\Models\User;
@@ -11,6 +12,8 @@ use Illuminate\Http\Request;
 
 class ComplaintController extends Controller
 {
+    use PaginatesApiResults;
+
     public function __construct(private readonly AccountService $accountService)
     {
     }
@@ -20,10 +23,9 @@ class ComplaintController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        return response()->json([
-            'message' => 'Complaints retrieved successfully.',
-            'data' => $this->accountService->listComplaints($user),
-        ]);
+        return response()->json(
+            $this->accountService->listComplaints($user, $this->perPage($request))
+        );
     }
 
     public function store(StoreComplaintRequest $request): JsonResponse

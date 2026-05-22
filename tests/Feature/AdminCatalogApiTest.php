@@ -43,20 +43,28 @@ class AdminCatalogApiTest extends TestCase
 
         $this->withToken($token)->getJson('/api/admin/categories?per_page=20')
             ->assertOk()
+            ->assertJsonPath('per_page', 20)
+            ->assertJsonPath('total', 2)
             ->assertJsonFragment(['name' => 'Active Category', 'is_active' => true])
             ->assertJsonFragment(['name' => 'Inactive Category', 'is_active' => false]);
 
         $this->withToken($token)->getJson('/api/admin/suppliers?per_page=20')
             ->assertOk()
+            ->assertJsonPath('per_page', 20)
+            ->assertJsonPath('total', 2)
             ->assertJsonFragment(['supplier_code' => 'SUP-ACTIVE', 'is_active' => true])
             ->assertJsonFragment(['supplier_code' => 'SUP-INACTIVE', 'is_active' => false]);
 
         $this->getJson('/api/categories?per_page=20')
             ->assertOk()
+            ->assertJsonPath('per_page', 20)
+            ->assertJsonPath('total', 1)
             ->assertJsonMissing(['name' => 'Inactive Category']);
 
         $this->getJson('/api/suppliers?per_page=20')
             ->assertOk()
+            ->assertJsonPath('per_page', 20)
+            ->assertJsonPath('total', 1)
             ->assertJsonMissing(['supplier_code' => 'SUP-INACTIVE']);
     }
 

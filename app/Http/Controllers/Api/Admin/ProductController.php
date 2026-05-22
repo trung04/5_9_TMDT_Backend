@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Api\Concerns\EnsuresAdminAccess;
+use App\Http\Controllers\Api\Concerns\PaginatesApiResults;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateProductRequest;
@@ -14,6 +15,7 @@ use Illuminate\Http\Request;
 class ProductController extends Controller
 {
     use EnsuresAdminAccess;
+    use PaginatesApiResults;
 
     public function index(Request $request): JsonResponse
     {
@@ -64,12 +66,11 @@ class ProductController extends Controller
             });
         }
 
-        $products = $query->orderByDesc('id')->get();
+        $products = $query
+            ->orderByDesc('id')
+            ->paginate($this->perPage($request));
 
-        return response()->json([
-            'message' => 'Products retrieved successfully.',
-            'data' => $products,
-        ], 200);
+        return response()->json($products);
     }
 
     public function show(Request $request, int $id): JsonResponse

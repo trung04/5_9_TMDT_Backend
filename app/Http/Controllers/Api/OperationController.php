@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\PaginatesApiResults;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderStatusHistory;
@@ -13,7 +14,9 @@ use Illuminate\Support\Facades\DB;
 
 class OperationController extends Controller
 {
-    public function inventory(): JsonResponse
+    use PaginatesApiResults;
+
+    public function inventory(Request $request): JsonResponse
     {
         $items = DB::table('inventory_items')
             ->join('inventories', 'inventories.id', '=', 'inventory_items.inventory_id')
@@ -41,8 +44,10 @@ class OperationController extends Controller
                 'inventory_items.updated_at',
             ])
             ->orderBy('products.sku')
-            ->get()
-            ->map(function ($item): array {
+            ->paginate($this->perPage($request));
+
+        return response()->json(
+            $this->transformPaginator($items, function ($item): array {
                 $onHand = (int) $item->quantity_on_hand;
                 $reorder = (int) $item->reorder_level;
                 $safety = (int) $item->safety_stock;
@@ -67,20 +72,18 @@ class OperationController extends Controller
                     'last_counted_at' => $item->last_counted_at,
                     'updated_at' => $item->updated_at,
                 ];
-            });
-
-        return response()->json([
-            'message' => 'Operation inventory retrieved successfully.',
-            'data' => $items,
-        ]);
+            })
+        );
     }
 
-    public function requisitions(): JsonResponse
+    public function requisitions(Request $request): JsonResponse
     {
-        return response()->json([
-            'message' => 'Operation requisitions retrieved successfully.',
-            'data' => $this->requisitionQuery()->get()->map(fn ($item): array => $this->requisitionPayload($item))->values(),
-        ]);
+        return response()->json(
+            $this->transformPaginator(
+                $this->requisitionQuery()->paginate($this->perPage($request)),
+                fn ($item): array => $this->requisitionPayload($item)
+            )
+        );
     }
 
     public function storeRequisition(Request $request): JsonResponse
@@ -139,21 +142,19 @@ class OperationController extends Controller
         ]);
     }
 
-    public function supplierOrders(): JsonResponse
+    public function supplierOrders(Request $request): JsonResponse
     {
         $orders = Order::query()
             ->with(['items.product.supplier', 'user', 'payment', 'statusHistory'])
             ->orderByDesc('id')
-            ->get()
-            ->map(fn (Order $order): array => $this->orderPayload($order));
+            ->paginate($this->perPage($request));
 
-        return response()->json([
-            'message' => 'Operation supplier orders retrieved successfully.',
-            'data' => $orders,
-        ]);
+        return response()->json(
+            $this->transformPaginator($orders, fn (Order $order): array => $this->orderPayload($order))
+        );
     }
 
-    public function fulfillmentTasks(): JsonResponse
+    public function fulfillmentTasks(Request $request): JsonResponse
     {
         $tasks = Order::query()
             ->with(['statusHistory', 'user'])
@@ -164,13 +165,11 @@ class OperationController extends Controller
                 Order::STATUS_SHIPPED,
             ])
             ->orderBy('created_at')
-            ->get()
-            ->map(fn (Order $order): array => $this->fulfillmentTaskPayload($order));
+            ->paginate($this->perPage($request));
 
-        return response()->json([
-            'message' => 'Operation fulfillment tasks retrieved successfully.',
-            'data' => $tasks,
-        ]);
+        return response()->json(
+            $this->transformPaginator($tasks, fn (Order $order): array => $this->fulfillmentTaskPayload($order))
+        );
     }
 
     public function updateOrderDeliveryStatus(Request $request, Order $order): JsonResponse

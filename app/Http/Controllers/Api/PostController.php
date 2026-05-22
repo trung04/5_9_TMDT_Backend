@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Api\Concerns\EnsuresCustomerAccess;
+use App\Http\Controllers\Api\Concerns\PaginatesApiResults;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePostCommentRequest;
 use App\Models\Post;
@@ -15,8 +16,9 @@ use Illuminate\Http\Request;
 class PostController extends Controller
 {
     use EnsuresCustomerAccess;
+    use PaginatesApiResults;
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         $posts = Post::query()
             ->published()
@@ -27,12 +29,11 @@ class PostController extends Controller
             ->withCount(['likes', 'visibleComments as comments_count'])
             ->orderByDesc('published_at')
             ->orderByDesc('id')
-            ->get();
+            ->paginate($this->perPage($request));
 
-        return response()->json([
-            'message' => 'Posts retrieved successfully.',
-            'data' => $posts->map(fn (Post $post): array => $this->postPayload($post))->values(),
-        ]);
+        return response()->json(
+            $this->transformPaginator($posts, fn (Post $post): array => $this->postPayload($post))
+        );
     }
 
     public function myLikes(Request $request): JsonResponse
