@@ -13,7 +13,7 @@ class SupplierService
      */
     public function getAllSuppliers(int $perPage = null): Collection|LengthAwarePaginator
     {
-        $query = Supplier::where('is_active', true);
+        $query = Supplier::query()->available();
 
         if ($perPage) {
             return $query->paginate($perPage);
@@ -27,7 +27,8 @@ class SupplierService
      */
     public function getSupplierById(int $id): ?Supplier
     {
-        return Supplier::where('is_active', true)
+        return Supplier::query()
+            ->available()
             ->withCount('products')
             ->find($id);
     }
@@ -45,6 +46,7 @@ class SupplierService
             'email' => $data['email'] ?? null,
             'address' => $data['address'] ?? null,
             'is_active' => $data['is_active'] ?? true,
+            'is_deleted' => $data['is_deleted'] ?? false,
         ]);
     }
 
@@ -53,6 +55,10 @@ class SupplierService
      */
     public function updateSupplier(Supplier $supplier, array $data): Supplier
     {
+        if (($data['is_active'] ?? false) === true && ! array_key_exists('is_deleted', $data)) {
+            $data['is_deleted'] = false;
+        }
+
         $supplier->update([
             'supplier_code' => $data['supplier_code'] ?? $supplier->supplier_code,
             'name' => $data['name'] ?? $supplier->name,
@@ -61,6 +67,7 @@ class SupplierService
             'email' => $data['email'] ?? $supplier->email,
             'address' => $data['address'] ?? $supplier->address,
             'is_active' => $data['is_active'] ?? $supplier->is_active,
+            'is_deleted' => $data['is_deleted'] ?? $supplier->is_deleted,
         ]);
 
         return $supplier;
@@ -71,12 +78,7 @@ class SupplierService
      */
     public function deleteSupplier(Supplier $supplier): bool
     {
-        // Check if supplier has products
-        if ($supplier->products()->exists()) {
-            throw new \Exception('Cannot delete supplier because it is associated with products.');
-        }
-
-        return $supplier->update(['is_active' => false]);
+        return $supplier->markDeleted();
     }
 
     /**
@@ -100,7 +102,7 @@ class SupplierService
     {
         return Supplier::findOrFail($supplierId)
             ->products()
-            ->where('is_active', true)
+            ->available()
             ->paginate($perPage);
     }
 }

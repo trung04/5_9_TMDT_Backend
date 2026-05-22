@@ -22,7 +22,10 @@ class AdminInsightService
      */
     public function dashboardPayload(array $filters = [], ?User $actor = null): array
     {
-        $suppliers = Supplier::query()->where('is_active', true)->latest('id')->get();
+        $suppliers = Supplier::query()
+            ->available()
+            ->latest('id')
+            ->get();
         $complaintCount = Complaint::query()->count();
         $lowStockThreshold = $this->resolveLowStockThreshold($actor);
 
@@ -78,7 +81,7 @@ class AdminInsightService
             ->count();
 
         $lowStockProductsQuery = Product::query()
-            ->where('is_active', true)
+            ->available()
             ->where('stock_quantity', '<=', $lowStockThreshold)
             ->orderBy('stock_quantity')
             ->orderBy('id');
@@ -248,7 +251,9 @@ class AdminInsightService
                 'low_stock_products' => $lowStockProductsCount,
                 'low_stock_threshold' => $lowStockThreshold,
                 'supplier_count' => $suppliers->count(),
-                'product_count' => Product::query()->where('is_active', true)->count(),
+                'product_count' => Product::query()
+                    ->available()
+                    ->count(),
                 'average_order_value' => $averageOrderValue,
                 'complaint_count' => $complaintCount,
             ],
@@ -279,7 +284,10 @@ class AdminInsightService
      */
     public function communityPayload(): array
     {
-        $suppliers = Supplier::query()->where('is_active', true)->withCount('products')->get();
+        $suppliers = Supplier::query()
+            ->available()
+            ->withCount('products')
+            ->get();
         $customers = User::query()
             ->where('role', User::ROLE_CUSTOMER)
             ->withCount([
@@ -305,7 +313,8 @@ class AdminInsightService
                 'email' => $supplier->email,
                 'address' => $supplier->address,
                 'product_count' => $supplier->products_count ?? 0,
-                'status' => $supplier->is_active ? 'ACTIVE' : 'INACTIVE',
+                'is_active' => (bool) $supplier->is_active,
+                'is_deleted' => (bool) $supplier->is_deleted,
             ])->all(),
             'customers' => $customers->map(fn (User $customer): array => [
                 'id' => $customer->id,
@@ -314,7 +323,8 @@ class AdminInsightService
                 'phone' => $customer->phone,
                 'order_count' => $customer->successful_orders_count ?? 0,
                 'total_spend' => $customer->successful_orders_sum_total_amount ?? 0,
-                'status' => $customer->status,
+                'is_active' => (bool) $customer->is_active,
+                'is_deleted' => (bool) $customer->is_deleted,
             ])->all(),
             'invitations' => $invitations->map(fn (SupplierInvitation $invitation): array => [
                 'id' => $invitation->id,

@@ -39,6 +39,8 @@ return new class extends Migration
             if (! Schema::hasColumn('orders', 'cancelled_at')) {
                 $table->dateTime('cancelled_at')->nullable()->after('delivered_at');
             }
+
+            $table->index('delivered_at');
         });
     }
 

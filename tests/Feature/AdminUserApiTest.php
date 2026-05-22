@@ -61,7 +61,6 @@ class AdminUserApiTest extends TestCase
             'reward_points' => 250,
             'reward_tier' => 'Gold',
             'next_tier_points' => 1500,
-            'status' => User::STATUS_ACTIVE,
             'is_active' => true,
         ])->assertOk()
             ->assertJsonPath('data.full_name', 'Customer Updated')
@@ -69,13 +68,13 @@ class AdminUserApiTest extends TestCase
 
         $this->withToken($token)->deleteJson("/api/admin/users/{$customerId}")
             ->assertOk()
-            ->assertJsonPath('data.status', User::STATUS_BLOCKED)
-            ->assertJsonPath('data.is_active', false);
+            ->assertJsonPath('data.is_active', false)
+            ->assertJsonPath('data.is_deleted', false);
 
         $this->assertDatabaseHas('users', [
             'id' => $customerId,
-            'status' => User::STATUS_BLOCKED,
             'is_active' => false,
+            'is_deleted' => false,
         ]);
     }
 
@@ -123,8 +122,8 @@ class AdminUserApiTest extends TestCase
 
         $this->assertDatabaseHas('users', [
             'id' => $customer->id,
-            'status' => User::STATUS_BLOCKED,
             'is_active' => false,
+            'is_deleted' => false,
         ]);
         $this->assertDatabaseHas('orders', [
             'id' => $order->id,

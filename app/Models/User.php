@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasActiveState;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,14 +19,8 @@ class User extends Authenticatable
     public const ROLE_WAREHOUSE_STAFF = 'WAREHOUSE_STAFF';
     public const ROLE_SUPPLIER = 'SUPPLIER';
 
-    public const STATUS_ACTIVE = 'ACTIVE';
-
-    public const STATUS_INACTIVE = 'INACTIVE';
-
-    public const STATUS_BLOCKED = 'BLOCKED';
-
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasActiveState, HasApiTokens, HasFactory, Notifiable;
 
     /**
      * The password column used by Laravel authentication.
@@ -65,8 +60,8 @@ class User extends Authenticatable
         'role',
         'admin_role_id',
         'created_by_admin_id',
-        'status',
         'is_active',
+        'is_deleted',
     ];
 
     /**
@@ -87,6 +82,7 @@ class User extends Authenticatable
     {
         return [
             'is_active' => 'boolean',
+            'is_deleted' => 'boolean',
             'newsletter' => 'boolean',
             'sms_alerts' => 'boolean',
             'order_email' => 'boolean',
@@ -103,7 +99,7 @@ class User extends Authenticatable
      */
     public function canAuthenticate(): bool
     {
-        return $this->status === self::STATUS_ACTIVE && $this->is_active;
+        return $this->is_active && ! $this->is_deleted;
     }
 
     public function isAdmin(): bool

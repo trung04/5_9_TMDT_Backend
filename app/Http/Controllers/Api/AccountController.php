@@ -139,7 +139,7 @@ class AccountController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        $product = Product::query()->findOrFail((int) $request->input('product_id'));
+        $product = Product::query()->available()->findOrFail((int) $request->input('product_id'));
 
         return response()->json([
             'message' => 'Wishlist updated successfully.',

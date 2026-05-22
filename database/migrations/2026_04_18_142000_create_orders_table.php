@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('orders', function (Blueprint $table) {
             $table->bigIncrements('id');
-            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('order_no', 30)->nullable()->unique();
             $table->string('recipient_name', 120);
             $table->string('recipient_phone', 20);
@@ -28,6 +28,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['user_id', 'status']);
+            $table->index(['status', 'created_at']);
             $table->index('created_at');
         });
     }

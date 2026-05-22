@@ -14,9 +14,13 @@ use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ComplaintController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\NewsletterSubscriptionController;
+use App\Http\Controllers\Api\OperationController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PostController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\RegionController;
+use App\Http\Controllers\Api\SupportTicketController;
 use App\Http\Controllers\Api\SupplierController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,6 +31,8 @@ Route::post('/login', [AuthController::class, 'login']);
 // Public product APIs
 Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/{id}', [ProductController::class, 'show']);
+Route::get('/regions', [RegionController::class, 'index']);
+Route::post('/newsletter-subscriptions', [NewsletterSubscriptionController::class, 'store']);
 
 // Public post APIs
 Route::get('/posts', [PostController::class, 'index']);
@@ -78,6 +84,21 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::patch('/orders/{order}/bank-transfer-submitted', [OrderController::class, 'confirmBankTransferSubmitted']);
     Route::patch('/orders/{order}/confirm-delivery', [OrderController::class, 'confirmDelivery']);
 
+    Route::get('/support-tickets', [SupportTicketController::class, 'index']);
+    Route::post('/support-tickets', [SupportTicketController::class, 'store']);
+    Route::patch('/support-tickets/{ticket}/resolve', [SupportTicketController::class, 'resolve']);
+
+    Route::prefix('operations')->group(function (): void {
+        Route::get('/inventory', [OperationController::class, 'inventory']);
+        Route::get('/requisitions', [OperationController::class, 'requisitions']);
+        Route::post('/requisitions', [OperationController::class, 'storeRequisition']);
+        Route::patch('/requisitions/{id}/status', [OperationController::class, 'updateRequisitionStatus']);
+        Route::get('/supplier-orders', [OperationController::class, 'supplierOrders']);
+        Route::get('/fulfillment-tasks', [OperationController::class, 'fulfillmentTasks']);
+        Route::patch('/orders/{order}/delivery-status', [OperationController::class, 'updateOrderDeliveryStatus']);
+        Route::patch('/fulfillment-tasks/{order}/advance', [OperationController::class, 'advanceFulfillmentTask']);
+    });
+
     Route::prefix('admin')->group(function (): void {
         Route::get('/dashboard', [AdminDashboardController::class, 'show']);
         Route::get('/community', [AdminCommunityController::class, 'index']);
@@ -124,6 +145,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     // Admin Category Routes
     Route::prefix('admin/categories')->group(function (): void {
+        Route::get('/', [CategoryController::class, 'adminIndex']);
         Route::post('/', [CategoryController::class, 'store']);
         Route::put('/{category}', [CategoryController::class, 'update']);
         Route::delete('/{category}', [CategoryController::class, 'destroy']);
@@ -131,6 +153,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     // Admin Supplier Routes
     Route::prefix('admin/suppliers')->group(function (): void {
+        Route::get('/', [SupplierController::class, 'adminIndex']);
         Route::post('/', [SupplierController::class, 'store']);
         Route::put('/{supplier}', [SupplierController::class, 'update']);
         Route::delete('/{supplier}', [SupplierController::class, 'destroy']);

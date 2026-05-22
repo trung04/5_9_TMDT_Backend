@@ -187,8 +187,8 @@ class AccessController extends Controller
             'role' => User::ROLE_ADMIN,
             'admin_role_id' => $role->id,
             'created_by_admin_id' => $creator->id,
-            'status' => $validated['status'] ?? User::STATUS_ACTIVE,
             'is_active' => $validated['is_active'] ?? true,
+            'is_deleted' => false,
         ]);
 
         return response()->json([
@@ -211,10 +211,12 @@ class AccessController extends Controller
 
         $validated = $request->validate($this->adminRules($adminModel->id, true));
         $role = $this->assignableAdminRole((int) $validated['admin_role_id'], $adminModel->isSuperAdmin());
+        $nextIsActive = $validated['is_active'] ?? $adminModel->is_active;
+        $nextIsDeleted = $validated['is_deleted'] ?? ($nextIsActive ? false : $adminModel->is_deleted);
         $this->assertNotRemovingLastSuperAdmin($adminModel, [
             'admin_role_id' => $role->id,
-            'status' => $validated['status'] ?? $adminModel->status,
-            'is_active' => $validated['is_active'] ?? $adminModel->is_active,
+            'is_active' => $nextIsActive,
+            'is_deleted' => $nextIsDeleted,
         ]);
 
         $adminModel->update([
@@ -222,8 +224,8 @@ class AccessController extends Controller
             'email' => Str::lower($validated['email']),
             'phone' => $validated['phone'],
             'admin_role_id' => $role->id,
-            'status' => $validated['status'] ?? $adminModel->status,
-            'is_active' => $validated['is_active'] ?? $adminModel->is_active,
+            'is_active' => $nextIsActive,
+            'is_deleted' => $nextIsDeleted,
         ]);
 
         return response()->json([
@@ -245,15 +247,19 @@ class AccessController extends Controller
         }
 
         $validated = $request->validate([
-            'status' => ['required', Rule::in([User::STATUS_ACTIVE, User::STATUS_INACTIVE, User::STATUS_BLOCKED])],
             'is_active' => ['required', 'boolean'],
+            'is_deleted' => ['nullable', 'boolean'],
+        ]);
+        $nextIsDeleted = $validated['is_deleted'] ?? ($validated['is_active'] ? false : $adminModel->is_deleted);
+
+        $this->assertNotRemovingLastSuperAdmin($adminModel, [
+            'is_active' => $validated['is_active'],
+            'is_deleted' => $nextIsDeleted,
         ]);
 
-        $this->assertNotRemovingLastSuperAdmin($adminModel, $validated);
-
         $adminModel->update([
-            'status' => $validated['status'],
             'is_active' => $validated['is_active'],
+            'is_deleted' => $nextIsDeleted,
         ]);
 
         return response()->json([
@@ -313,8 +319,8 @@ class AccessController extends Controller
                 Rule::unique('users', 'phone')->ignore($ignoreUserId),
             ],
             'admin_role_id' => ['required', 'integer', 'exists:admin_roles,id'],
-            'status' => ['nullable', Rule::in([User::STATUS_ACTIVE, User::STATUS_INACTIVE, User::STATUS_BLOCKED])],
             'is_active' => ['nullable', 'boolean'],
+            'is_deleted' => ['nullable', 'boolean'],
             'password' => [$updating ? 'sometimes' : 'required', 'string', 'min:8'],
         ];
     }
@@ -379,8 +385,8 @@ class AccessController extends Controller
         $nextRoleId = (int) ($nextState['admin_role_id'] ?? $admin->admin_role_id);
         $nextRole = AdminRole::query()->find($nextRoleId);
         $willRemainSuper = $nextRole?->is_super
-            && ($nextState['status'] ?? $admin->status) === User::STATUS_ACTIVE
-            && (bool) ($nextState['is_active'] ?? $admin->is_active);
+            && (bool) ($nextState['is_active'] ?? $admin->is_active)
+            && ! (bool) ($nextState['is_deleted'] ?? $admin->is_deleted);
 
         if ($willRemainSuper || $this->activeSuperAdminCount() > 1) {
             return;
@@ -395,8 +401,7 @@ class AccessController extends Controller
     {
         return User::query()
             ->where('role', User::ROLE_ADMIN)
-            ->where('status', User::STATUS_ACTIVE)
-            ->where('is_active', true)
+            ->available()
             ->whereHas('adminRole', fn ($query) => $query->where('is_super', true))
             ->count();
     }
@@ -444,8 +449,8 @@ class AccessController extends Controller
             'email' => $admin->email,
             'phone' => $admin->phone,
             'role' => $admin->role,
-            'status' => $admin->status,
             'is_active' => (bool) $admin->is_active,
+            'is_deleted' => (bool) $admin->is_deleted,
             'admin_role' => $admin->adminRole ? [
                 'id' => $admin->adminRole->id,
                 'name' => $admin->adminRole->name,

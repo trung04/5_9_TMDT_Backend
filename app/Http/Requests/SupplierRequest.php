@@ -67,6 +67,7 @@ class SupplierRequest extends FormRequest
             ],
             'address' => ['nullable', 'string', 'max:255'],
             'is_active' => ['nullable', 'boolean'],
+            'is_deleted' => ['nullable', 'boolean'],
         ];
     }
 }

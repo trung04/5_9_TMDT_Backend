@@ -12,11 +12,15 @@ class ProductController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = Product::query()
-            ->with(['category', 'supplier'])
-            ->where('is_active', true);
+            ->with(['category', 'supplier', 'region'])
+            ->available();
 
         if ($request->filled('category_id')) {
             $query->where('category_id', (int) $request->input('category_id'));
+        }
+
+        if ($request->filled('region_id')) {
+            $query->where('region_id', (int) $request->input('region_id'));
         }
 
         if ($request->filled('keyword')) {
@@ -39,8 +43,8 @@ class ProductController extends Controller
     public function show(int $id): JsonResponse
     {
         $product = Product::query()
-            ->with(['category', 'supplier'])
-            ->where('is_active', true)
+            ->with(['category', 'supplier', 'region'])
+            ->available()
             ->find($id);
 
         if (! $product) {

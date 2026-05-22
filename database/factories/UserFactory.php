@@ -29,8 +29,8 @@ class UserFactory extends Factory
             'phone' => fake()->unique()->numerify('09########'),
             'password_hash' => static::$passwordHash ??= Hash::make('password123'),
             'role' => User::ROLE_CUSTOMER,
-            'status' => User::STATUS_ACTIVE,
             'is_active' => true,
+            'is_deleted' => false,
         ];
     }
 }

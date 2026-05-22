@@ -74,8 +74,8 @@ class UserController extends Controller
             'email' => Str::lower($validated['email']),
             'password_hash' => Hash::make($validated['password']),
             'role' => User::ROLE_CUSTOMER,
-            'status' => $validated['status'] ?? User::STATUS_ACTIVE,
             'is_active' => $validated['is_active'] ?? true,
+            'is_deleted' => false,
         ]);
 
         return response()->json([
@@ -95,12 +95,14 @@ class UserController extends Controller
         }
 
         $validated = $request->validate($this->rules($user->id, true));
+        $nextIsActive = $validated['is_active'] ?? $user->is_active;
+        $nextIsDeleted = $validated['is_deleted'] ?? ($nextIsActive ? false : $user->is_deleted);
 
         $user->update([
             ...$this->profileAttributes($validated),
             'email' => Str::lower($validated['email']),
-            'status' => $validated['status'] ?? $user->status,
-            'is_active' => $validated['is_active'] ?? $user->is_active,
+            'is_active' => $nextIsActive,
+            'is_deleted' => $nextIsDeleted,
         ]);
 
         return response()->json([
@@ -119,13 +121,10 @@ class UserController extends Controller
             return $response;
         }
 
-        $user->update([
-            'status' => User::STATUS_BLOCKED,
-            'is_active' => false,
-        ]);
+        $user->markInactive();
 
         return response()->json([
-            'message' => 'Admin user blocked successfully.',
+            'message' => 'Admin user deactivated successfully.',
             'data' => $this->customerPayload($user->refresh()->loadCount('orders')),
         ]);
     }
@@ -159,8 +158,8 @@ class UserController extends Controller
             'reward_points' => ['nullable', 'integer', 'min:0'],
             'reward_tier' => ['nullable', 'string', 'max:50'],
             'next_tier_points' => ['nullable', 'integer', 'min:0'],
-            'status' => ['nullable', Rule::in([User::STATUS_ACTIVE, User::STATUS_INACTIVE, User::STATUS_BLOCKED])],
             'is_active' => ['nullable', 'boolean'],
+            'is_deleted' => ['nullable', 'boolean'],
         ];
     }
 
@@ -213,8 +212,8 @@ class UserController extends Controller
             'reward_tier' => $user->reward_tier,
             'next_tier_points' => (int) $user->next_tier_points,
             'role' => $user->role,
-            'status' => $user->status,
             'is_active' => (bool) $user->is_active,
+            'is_deleted' => (bool) $user->is_deleted,
             'orders_count' => (int) ($user->orders_count ?? $user->orders()->count()),
             'created_at' => optional($user->created_at)->toISOString(),
             'updated_at' => optional($user->updated_at)->toISOString(),

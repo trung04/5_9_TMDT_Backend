@@ -13,7 +13,7 @@ class CategoryService
      */
     public function getAllCategories(int $perPage = null): Collection|LengthAwarePaginator
     {
-        $query = Category::where('is_active', true);
+        $query = Category::query()->available();
 
         if ($perPage) {
             return $query->paginate($perPage);
@@ -27,7 +27,8 @@ class CategoryService
      */
     public function getCategoryById(int $id): ?Category
     {
-        return Category::where('is_active', true)
+        return Category::query()
+            ->available()
             ->withCount('products')
             ->find($id);
     }
@@ -41,6 +42,7 @@ class CategoryService
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
             'is_active' => $data['is_active'] ?? true,
+            'is_deleted' => $data['is_deleted'] ?? false,
         ]);
     }
 
@@ -49,10 +51,15 @@ class CategoryService
      */
     public function updateCategory(Category $category, array $data): Category
     {
+        if (($data['is_active'] ?? false) === true && ! array_key_exists('is_deleted', $data)) {
+            $data['is_deleted'] = false;
+        }
+
         $category->update([
             'name' => $data['name'] ?? $category->name,
             'description' => $data['description'] ?? $category->description,
             'is_active' => $data['is_active'] ?? $category->is_active,
+            'is_deleted' => $data['is_deleted'] ?? $category->is_deleted,
         ]);
 
         return $category;
@@ -63,7 +70,7 @@ class CategoryService
      */
     public function deleteCategory(Category $category): bool
     {
-        return $category->update(['is_active' => false]);
+        return $category->markDeleted();
     }
 
     /**
@@ -90,7 +97,7 @@ class CategoryService
     ): LengthAwarePaginator {
         $query = Category::findOrFail($categoryId)
             ->products()
-            ->where('is_active', true);
+            ->available();
 
         // Filter by price range if provided
         if (isset($filters['min_price'])) {

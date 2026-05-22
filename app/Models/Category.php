@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasActiveState;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Category extends Model
 {
+    use HasActiveState;
+
     /**
      * The attributes that are mass assignable.
      *
@@ -16,6 +19,7 @@ class Category extends Model
         'name',
         'description',
         'is_active',
+        'is_deleted',
     ];
 
     /**
@@ -27,6 +31,7 @@ class Category extends Model
     {
         return [
             'is_active' => 'boolean',
+            'is_deleted' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

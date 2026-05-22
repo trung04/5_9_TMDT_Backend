@@ -25,8 +25,8 @@ class AuthController extends Controller
             'phone' => $request->string('phone')->toString(),
             'password_hash' => Hash::make($request->string('password')->toString()),
             'role' => User::ROLE_CUSTOMER,
-            'status' => User::STATUS_ACTIVE,
             'is_active' => true,
+            'is_deleted' => false,
         ]);
 
         return $this->authenticatedResponse($user, 'User registered successfully.', 201);
@@ -129,8 +129,8 @@ class AuthController extends Controller
             'email',
             'phone',
             'role',
-            'status',
             'is_active',
+            'is_deleted',
             'created_at',
             'updated_at',
         ]);

@@ -106,6 +106,7 @@ class OrderService
 
             $products = Product::query()
                 ->whereIn('id', $cartItems->pluck('product_id')->all())
+                ->available()
                 ->lockForUpdate()
                 ->get()
                 ->keyBy('id');
@@ -115,7 +116,7 @@ class OrderService
             foreach ($cartItems as $cartItem) {
                 $product = $products->get($cartItem->product_id);
 
-                if (! $product || ! $product->is_active) {
+                if (! $product || ! $product->is_active || $product->is_deleted) {
                     throw ValidationException::withMessages([
                         'cart' => ['Một hoặc nhiều sản phẩm trong giỏ hiện không còn khả dụng.'],
                     ]);
@@ -657,8 +658,8 @@ class OrderService
             'email' => $user->email,
             'phone' => $user->phone,
             'role' => $user->role,
-            'status' => $user->status,
-            'is_active' => $user->is_active,
+            'is_active' => (bool) $user->is_active,
+            'is_deleted' => (bool) $user->is_deleted,
         ];
     }
 
@@ -875,6 +876,7 @@ class OrderService
 
         $products = Product::query()
             ->whereIn('id', $order->items->pluck('product_id')->all())
+            ->available()
             ->lockForUpdate()
             ->get()
             ->keyBy('id');
@@ -882,7 +884,7 @@ class OrderService
         foreach ($order->items as $item) {
             $product = $products->get($item->product_id);
 
-            if (! $product || ! $product->is_active || $product->stock_quantity < $item->quantity) {
+            if (! $product || ! $product->is_active || $product->is_deleted || $product->stock_quantity < $item->quantity) {
                 throw ValidationException::withMessages([
                     'stock' => [
                         "Không đủ tồn kho để xác nhận đơn hàng. Sản phẩm {$item->product_name_snapshot} chỉ còn "

@@ -34,17 +34,36 @@ return new class extends Migration
             $table->primary(['admin_role_id', 'admin_permission_id']);
         });
 
-        Schema::table('users', function (Blueprint $table) {
-            $table->foreignId('admin_role_id')->nullable()->after('role')->constrained('admin_roles')->nullOnDelete();
-            $table->foreignId('created_by_admin_id')->nullable()->after('admin_role_id')->constrained('users')->nullOnDelete();
+        $canAlterForeignKeys = Schema::getConnection()->getDriverName() !== 'sqlite';
+
+        Schema::table('users', function (Blueprint $table) use ($canAlterForeignKeys) {
+            if (! Schema::hasColumn('users', 'admin_role_id')) {
+                $table->foreignId('admin_role_id')->nullable()->after('role')->constrained('admin_roles')->nullOnDelete();
+            } elseif ($canAlterForeignKeys) {
+                $table->foreign('admin_role_id')->references('id')->on('admin_roles')->nullOnDelete();
+            }
+
+            if (! Schema::hasColumn('users', 'created_by_admin_id')) {
+                $table->foreignId('created_by_admin_id')->nullable()->after('admin_role_id')->constrained('users')->nullOnDelete();
+            } elseif ($canAlterForeignKeys) {
+                $table->foreign('created_by_admin_id')->references('id')->on('users')->nullOnDelete();
+            }
         });
     }
 
     public function down(): void
     {
+        if (Schema::getConnection()->getDriverName() === 'sqlite') {
+            Schema::dropIfExists('admin_role_permission');
+            Schema::dropIfExists('admin_permissions');
+            Schema::dropIfExists('admin_roles');
+
+            return;
+        }
+
         Schema::table('users', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('created_by_admin_id');
-            $table->dropConstrainedForeignId('admin_role_id');
+            $table->dropForeign(['created_by_admin_id']);
+            $table->dropForeign(['admin_role_id']);
         });
 
         Schema::dropIfExists('admin_role_permission');

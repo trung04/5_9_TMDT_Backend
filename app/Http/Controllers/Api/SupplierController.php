@@ -45,13 +45,45 @@ class SupplierController extends Controller
     }
 
     /**
+     * Get list of all suppliers for admin management, including inactive ones.
+     */
+    public function adminIndex(Request $request): JsonResponse
+    {
+        if ($response = $this->ensureAdminWithAnyPermission($request, [
+            'admin.suppliers.create',
+            'admin.suppliers.update',
+            'admin.suppliers.delete',
+        ])) {
+            return $response;
+        }
+
+        $perPage = (int) $request->query('per_page', 100);
+        $perPage = min(max($perPage, 1), 200);
+
+        $suppliers = Supplier::query()
+            ->orderByDesc('id')
+            ->paginate($perPage);
+
+        return response()->json([
+            'message' => 'Admin suppliers retrieved successfully.',
+            'data' => $suppliers->items(),
+            'pagination' => [
+                'total' => $suppliers->total(),
+                'per_page' => $suppliers->perPage(),
+                'current_page' => $suppliers->currentPage(),
+                'last_page' => $suppliers->lastPage(),
+            ],
+        ]);
+    }
+
+    /**
      * Get supplier details with product count (public endpoint).
      *
      * @urlParam id int The supplier ID. Example: 1
      */
     public function show(Supplier $supplier): JsonResponse
     {
-        if (! $supplier->is_active) {
+        if (! $supplier->is_active || $supplier->is_deleted) {
             return response()->json([
                 'message' => 'Supplier not found.',
             ], 404);
@@ -73,7 +105,7 @@ class SupplierController extends Controller
      */
     public function getProducts(Supplier $supplier, Request $request): JsonResponse
     {
-        if (! $supplier->is_active) {
+        if (! $supplier->is_active || $supplier->is_deleted) {
             return response()->json([
                 'message' => 'Supplier not found.',
             ], 404);
@@ -149,11 +181,34 @@ class SupplierController extends Controller
 
             return response()->json([
                 'message' => 'Supplier deleted successfully.',
+                'data' => $supplier->refresh(),
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'message' => $e->getMessage(),
             ], 400);
         }
+    }
+
+    /**
+     * @param array<int, string> $permissionKeys
+     */
+    private function ensureAdminWithAnyPermission(Request $request, array $permissionKeys): ?JsonResponse
+    {
+        if ($response = $this->ensureAdmin($request)) {
+            return $response;
+        }
+
+        $user = $request->user();
+
+        foreach ($permissionKeys as $permissionKey) {
+            if ($user->hasAdminPermission($permissionKey)) {
+                return null;
+            }
+        }
+
+        return response()->json([
+            'message' => 'You do not have permission to access this resource.',
+        ], 403);
     }
 }

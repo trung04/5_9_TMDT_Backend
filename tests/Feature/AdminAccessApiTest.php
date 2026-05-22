@@ -132,7 +132,6 @@ class AdminAccessApiTest extends TestCase
             ->assertStatus(422);
 
         $this->withToken($token)->patchJson("/api/admin/access/admins/{$superAdmin->id}/status", [
-            'status' => User::STATUS_BLOCKED,
             'is_active' => false,
         ])->assertStatus(422)
             ->assertJsonValidationErrors(['admin']);

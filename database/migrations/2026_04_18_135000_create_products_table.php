@@ -22,10 +22,11 @@ return new class extends Migration
             $table->decimal('sale_price', 15, 2);
             $table->unsignedInteger('stock_quantity')->default(0);
             $table->boolean('is_active')->default(true);
+            $table->boolean('is_deleted')->default(false);
             $table->timestamps();
 
-            $table->index(['category_id', 'is_active']);
-            $table->index(['supplier_id', 'is_active']);
+            $table->index(['category_id', 'is_active', 'is_deleted']);
+            $table->index(['supplier_id', 'is_active', 'is_deleted']);
         });
     }
 

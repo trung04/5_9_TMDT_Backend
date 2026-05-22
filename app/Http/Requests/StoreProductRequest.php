@@ -19,13 +19,23 @@ class StoreProductRequest extends FormRequest
         return [
             'category_id' => ['required', 'integer', 'exists:categories,id'],
             'supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
+            'region_id' => ['nullable', 'integer', 'exists:regions,id'],
             'sku' => ['required', 'string', 'max:80', 'unique:products,sku'],
+            'slug' => ['nullable', 'string', 'max:180', 'unique:products,slug'],
             'name' => ['required', 'string', 'max:180'],
             'description' => ['nullable', 'string'],
+            'short_description' => ['nullable', 'string'],
             'image_url' => ['nullable', 'url', 'max:2048'],
+            'origin' => ['nullable', 'string', 'max:180'],
+            'weight' => ['nullable', 'string', 'max:80'],
+            'shelf_life' => ['nullable', 'string', 'max:120'],
+            'certifications' => ['nullable', 'array'],
+            'certifications.*' => ['string', 'max:120'],
+            'gallery' => ['nullable', 'array'],
             'sale_price' => ['required', 'numeric', 'min:0'],
             'stock_quantity' => ['required', 'integer', 'min:0'],
             'is_active' => ['nullable', 'boolean'],
+            'is_deleted' => ['nullable', 'boolean'],
         ];
     }
 

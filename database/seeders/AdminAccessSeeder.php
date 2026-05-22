@@ -86,8 +86,8 @@ class AdminAccessSeeder extends Seeder
             'role' => User::ROLE_ADMIN,
             'admin_role_id' => $superRole->id,
             'created_by_admin_id' => null,
-            'status' => User::STATUS_ACTIVE,
             'is_active' => true,
+            'is_deleted' => false,
         ])->save();
 
         return $admin->refresh();

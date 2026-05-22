@@ -46,6 +46,7 @@ class CategoryRequest extends FormRequest
             ],
             'description' => ['nullable', 'string', 'max:1000'],
             'is_active' => ['nullable', 'boolean'],
+            'is_deleted' => ['nullable', 'boolean'],
         ];
     }
 

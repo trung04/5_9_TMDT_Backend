@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('payments', function (Blueprint $table) {
             $table->bigIncrements('id');
-            $table->foreignId('order_id')->constrained('orders')->cascadeOnDelete();
+            $table->foreignId('order_id')->unique()->constrained('orders')->cascadeOnDelete();
             $table->string('transaction_code', 80)->nullable()->unique();
             $table->string('payment_method', 30);
             $table->string('payment_status', 30);
@@ -23,6 +23,8 @@ return new class extends Migration
             $table->timestamp('paid_at')->nullable();
             $table->json('raw_payload')->nullable();
             $table->timestamps();
+
+            $table->index('payment_status');
         });
     }
 

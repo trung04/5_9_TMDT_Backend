@@ -77,9 +77,9 @@ class CartService
                 $cart = $cart->fresh();
             }
 
-            $product = Product::query()->lockForUpdate()->find($productId);
+            $product = Product::query()->available()->lockForUpdate()->find($productId);
 
-            if (! $product || ! $product->is_active) {
+            if (! $product || ! $product->is_active || $product->is_deleted) {
                 throw ValidationException::withMessages([
                     'product_id' => ['Sản phẩm hiện không còn khả dụng.'],
                 ]);
@@ -132,9 +132,9 @@ class CartService
     {
         return DB::transaction(function () use ($cartItem, $quantity): Cart {
             $cartItem = CartItem::query()->lockForUpdate()->findOrFail($cartItem->id);
-            $product = Product::query()->lockForUpdate()->find($cartItem->product_id);
+            $product = Product::query()->available()->lockForUpdate()->find($cartItem->product_id);
 
-            if (! $product || ! $product->is_active) {
+            if (! $product || ! $product->is_active || $product->is_deleted) {
                 throw ValidationException::withMessages([
                     'product_id' => ['Sản phẩm hiện không còn khả dụng.'],
                 ]);
@@ -203,7 +203,7 @@ class CartService
 
     private function ensureQuantityIsAvailable(Product $product, int $quantity): void
     {
-        if (! $product->is_active) {
+        if (! $product->is_active || $product->is_deleted) {
             throw ValidationException::withMessages([
                 'product_id' => ['Sản phẩm hiện không còn khả dụng.'],
             ]);
@@ -257,6 +257,7 @@ class CartService
                 'sale_price' => $product->sale_price,
                 'stock_quantity' => $product->stock_quantity,
                 'is_active' => $product->is_active,
+                'is_deleted' => $product->is_deleted,
                 'category' => $product->category,
                 'supplier' => $product->supplier,
             ],

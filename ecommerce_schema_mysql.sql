@@ -29,13 +29,14 @@ CREATE TABLE IF NOT EXISTS `users` (
   `role` ENUM('CUSTOMER','ADMIN','WAREHOUSE_STAFF','SUPPLIER') NOT NULL,
   `admin_role_id` BIGINT UNSIGNED NULL,
   `created_by_admin_id` BIGINT UNSIGNED NULL,
-  `status` ENUM('ACTIVE','INACTIVE','BLOCKED') NOT NULL DEFAULT 'ACTIVE',
   `is_active` BOOLEAN NOT NULL DEFAULT TRUE,
+  `is_deleted` BOOLEAN NOT NULL DEFAULT FALSE,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_users_email` (`email`),
   UNIQUE KEY `uk_users_phone` (`phone`),
+  KEY `idx_users_role_active_deleted` (`role`, `is_active`, `is_deleted`),
   KEY `idx_users_admin_role_id` (`admin_role_id`),
   KEY `idx_users_created_by_admin_id` (`created_by_admin_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -213,11 +214,12 @@ CREATE TABLE IF NOT EXISTS `categories` (
   `name` VARCHAR(120) NOT NULL,
   `description` TEXT NULL,
   `is_active` BOOLEAN NOT NULL DEFAULT TRUE,
+  `is_deleted` BOOLEAN NOT NULL DEFAULT FALSE,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_categories_name` (`name`),
-  KEY `idx_categories_is_active` (`is_active`)
+  KEY `idx_categories_active_deleted` (`is_active`, `is_deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `suppliers` (
@@ -229,13 +231,14 @@ CREATE TABLE IF NOT EXISTS `suppliers` (
   `email` VARCHAR(120) NULL,
   `address` VARCHAR(255) NULL,
   `is_active` BOOLEAN NOT NULL DEFAULT TRUE,
+  `is_deleted` BOOLEAN NOT NULL DEFAULT FALSE,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_suppliers_supplier_code` (`supplier_code`),
   UNIQUE KEY `uk_suppliers_phone` (`phone`),
   UNIQUE KEY `uk_suppliers_email` (`email`),
-  KEY `idx_suppliers_is_active` (`is_active`)
+  KEY `idx_suppliers_active_deleted` (`is_active`, `is_deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `products` (
@@ -249,12 +252,13 @@ CREATE TABLE IF NOT EXISTS `products` (
   `sale_price` DECIMAL(15,2) NOT NULL,
   `stock_quantity` INT UNSIGNED NOT NULL DEFAULT 0,
   `is_active` BOOLEAN NOT NULL DEFAULT TRUE,
+  `is_deleted` BOOLEAN NOT NULL DEFAULT FALSE,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_products_sku` (`sku`),
-  KEY `idx_products_category_active` (`category_id`, `is_active`),
-  KEY `idx_products_supplier_active` (`supplier_id`, `is_active`),
+  KEY `idx_products_category_active_deleted` (`category_id`, `is_active`, `is_deleted`),
+  KEY `idx_products_supplier_active_deleted` (`supplier_id`, `is_active`, `is_deleted`),
   CONSTRAINT `chk_products_sale_price_nonnegative` CHECK (`sale_price` >= 0),
   CONSTRAINT `fk_products_category`
     FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE RESTRICT,
@@ -296,7 +300,7 @@ CREATE TABLE IF NOT EXISTS `carts` (
 
 CREATE TABLE IF NOT EXISTS `orders` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `user_id` BIGINT UNSIGNED NOT NULL,
+  `user_id` BIGINT UNSIGNED NULL,
   `order_no` VARCHAR(30) NULL,
   `recipient_name` VARCHAR(120) NOT NULL,
   `recipient_phone` VARCHAR(20) NOT NULL,
@@ -320,13 +324,15 @@ CREATE TABLE IF NOT EXISTS `orders` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_orders_order_no` (`order_no`),
   KEY `idx_orders_user_status` (`user_id`, `status`),
+  KEY `idx_orders_status_created_at` (`status`, `created_at`),
   KEY `idx_orders_created_at` (`created_at`),
+  KEY `idx_orders_delivered_at` (`delivered_at`),
   CONSTRAINT `chk_orders_subtotal_nonnegative` CHECK (`subtotal` >= 0),
   CONSTRAINT `chk_orders_shipping_fee_nonnegative` CHECK (`shipping_fee` >= 0),
   CONSTRAINT `chk_orders_discount_amount_nonnegative` CHECK (`discount_amount` >= 0),
   CONSTRAINT `chk_orders_total_amount_nonnegative` CHECK (`total_amount` >= 0),
   CONSTRAINT `fk_orders_user`
-    FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+    FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `inventories` (
@@ -429,8 +435,9 @@ CREATE TABLE IF NOT EXISTS `payments` (
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_payments_order_id` (`order_id`),
   UNIQUE KEY `uk_payments_transaction_code` (`transaction_code`),
-  KEY `idx_payments_order_id` (`order_id`),
+  KEY `idx_payments_payment_status` (`payment_status`),
   CONSTRAINT `chk_payments_amount_nonnegative` CHECK (`amount` >= 0),
   CONSTRAINT `fk_payments_order`
     FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE
@@ -506,7 +513,7 @@ CREATE TABLE IF NOT EXISTS `reviews` (
   CONSTRAINT `fk_reviews_user`
     FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_reviews_product`
-    FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE
+    FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `inventory_items` (

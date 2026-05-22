@@ -32,8 +32,8 @@ class AuthApiTest extends TestCase
                     'email',
                     'phone',
                     'role',
-                    'status',
                     'is_active',
+                    'is_deleted',
                     'created_at',
                     'updated_at',
                 ],
@@ -41,8 +41,8 @@ class AuthApiTest extends TestCase
             ->assertJsonPath('token_type', 'Bearer')
             ->assertJsonPath('user.email', 'newuser@example.com')
             ->assertJsonPath('user.role', User::ROLE_CUSTOMER)
-            ->assertJsonPath('user.status', User::STATUS_ACTIVE)
-            ->assertJsonPath('user.is_active', true);
+            ->assertJsonPath('user.is_active', true)
+            ->assertJsonPath('user.is_deleted', false);
 
         $user = User::query()->where('email', 'newuser@example.com')->firstOrFail();
 
@@ -125,16 +125,16 @@ class AuthApiTest extends TestCase
     public function test_login_rejects_accounts_that_cannot_authenticate(): void
     {
         $cases = [
-            ['email' => 'inactive@example.com', 'status' => User::STATUS_INACTIVE, 'is_active' => true],
-            ['email' => 'blocked@example.com', 'status' => User::STATUS_BLOCKED, 'is_active' => true],
-            ['email' => 'disabled@example.com', 'status' => User::STATUS_ACTIVE, 'is_active' => false],
+            ['email' => 'inactive@example.com', 'is_active' => false, 'is_deleted' => false],
+            ['email' => 'deleted@example.com', 'is_active' => true, 'is_deleted' => true],
+            ['email' => 'disabled-deleted@example.com', 'is_active' => false, 'is_deleted' => true],
         ];
 
         foreach ($cases as $case) {
             User::factory()->create([
                 'email' => $case['email'],
-                'status' => $case['status'],
                 'is_active' => $case['is_active'],
+                'is_deleted' => $case['is_deleted'],
                 'password_hash' => Hash::make('password123'),
             ]);
 

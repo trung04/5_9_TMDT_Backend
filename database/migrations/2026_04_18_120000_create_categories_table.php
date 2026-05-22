@@ -16,9 +16,10 @@ return new class extends Migration
             $table->string('name', 120)->unique();
             $table->text('description')->nullable();
             $table->boolean('is_active')->default(true);
+            $table->boolean('is_deleted')->default(false);
             $table->timestamps();
 
-            $table->index('is_active');
+            $table->index(['is_active', 'is_deleted']);
         });
     }
 

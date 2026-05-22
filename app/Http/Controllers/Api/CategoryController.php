@@ -45,13 +45,45 @@ class CategoryController extends Controller
     }
 
     /**
+     * Get list of all categories for admin management, including inactive ones.
+     */
+    public function adminIndex(Request $request): JsonResponse
+    {
+        if ($response = $this->ensureAdminWithAnyPermission($request, [
+            'admin.categories.create',
+            'admin.categories.update',
+            'admin.categories.delete',
+        ])) {
+            return $response;
+        }
+
+        $perPage = (int) $request->query('per_page', 100);
+        $perPage = min(max($perPage, 1), 200);
+
+        $categories = Category::query()
+            ->orderByDesc('id')
+            ->paginate($perPage);
+
+        return response()->json([
+            'message' => 'Admin categories retrieved successfully.',
+            'data' => $categories->items(),
+            'pagination' => [
+                'total' => $categories->total(),
+                'per_page' => $categories->perPage(),
+                'current_page' => $categories->currentPage(),
+                'last_page' => $categories->lastPage(),
+            ],
+        ]);
+    }
+
+    /**
      * Get category details with product count (public endpoint).
      *
      * @urlParam id int The category ID. Example: 1
      */
     public function show(Category $category): JsonResponse
     {
-        if (! $category->is_active) {
+        if (! $category->is_active || $category->is_deleted) {
             return response()->json([
                 'message' => 'Category not found.',
             ], 404);
@@ -119,6 +151,7 @@ class CategoryController extends Controller
 
         return response()->json([
             'message' => 'Category deleted successfully.',
+            'data' => $category->refresh(),
         ]);
     }
 
@@ -135,7 +168,7 @@ class CategoryController extends Controller
      */
     public function getProducts(Request $request, Category $category): JsonResponse
     {
-        if (! $category->is_active) {
+        if (! $category->is_active || $category->is_deleted) {
             return response()->json([
                 'message' => 'Category not found.',
             ], 404);
@@ -170,5 +203,27 @@ class CategoryController extends Controller
                 'last_page' => $products->lastPage(),
             ],
         ]);
+    }
+
+    /**
+     * @param array<int, string> $permissionKeys
+     */
+    private function ensureAdminWithAnyPermission(Request $request, array $permissionKeys): ?JsonResponse
+    {
+        if ($response = $this->ensureAdmin($request)) {
+            return $response;
+        }
+
+        $user = $request->user();
+
+        foreach ($permissionKeys as $permissionKey) {
+            if ($user->hasAdminPermission($permissionKey)) {
+                return null;
+            }
+        }
+
+        return response()->json([
+            'message' => 'You do not have permission to access this resource.',
+        ], 403);
     }
 }

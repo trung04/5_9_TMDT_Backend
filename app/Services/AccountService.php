@@ -262,7 +262,7 @@ class AccountService
 
         $products = $items
             ->map(fn (WishlistItem $item) => $item->product)
-            ->filter()
+            ->filter(fn (?Product $product): bool => (bool) $product?->is_active && ! (bool) $product?->is_deleted)
             ->values();
 
         return [

@@ -10,7 +10,6 @@ use App\Http\Requests\UpdateProductStatusRequest;
 use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
@@ -22,10 +21,14 @@ class ProductController extends Controller
             return $response;
         }
 
-        $query = Product::query()->with(['category', 'supplier']);
+        $query = Product::query()->with(['category', 'supplier', 'region']);
 
         if ($request->filled('category_id')) {
             $query->where('category_id', (int) $request->input('category_id'));
+        }
+
+        if ($request->filled('region_id')) {
+            $query->where('region_id', (int) $request->input('region_id'));
         }
 
         if ($request->filled('is_active')) {
@@ -37,6 +40,18 @@ class ProductController extends Controller
 
             if ($isActive !== null) {
                 $query->where('is_active', $isActive);
+            }
+        }
+
+        if ($request->filled('is_deleted')) {
+            $isDeleted = filter_var(
+                $request->input('is_deleted'),
+                FILTER_VALIDATE_BOOLEAN,
+                FILTER_NULL_ON_FAILURE
+            );
+
+            if ($isDeleted !== null) {
+                $query->where('is_deleted', $isDeleted);
             }
         }
 
@@ -64,7 +79,7 @@ class ProductController extends Controller
         }
 
         $product = Product::query()
-            ->with(['category', 'supplier'])
+            ->with(['category', 'supplier', 'region'])
             ->find($id);
 
         if (! $product) {
@@ -87,12 +102,13 @@ class ProductController extends Controller
 
         $data = $request->validated();
         $data['is_active'] = $data['is_active'] ?? true;
+        $data['is_deleted'] = $data['is_deleted'] ?? false;
 
         $product = Product::query()->create($data);
 
         return response()->json([
             'message' => 'Product created successfully.',
-            'data' => $product->load(['category', 'supplier']),
+            'data' => $product->load(['category', 'supplier', 'region']),
         ], 201);
     }
 
@@ -110,11 +126,17 @@ class ProductController extends Controller
             ], 404);
         }
 
-        $product->update($request->validated());
+        $data = $request->validated();
+
+        if (($data['is_active'] ?? false) === true && ! array_key_exists('is_deleted', $data)) {
+            $data['is_deleted'] = false;
+        }
+
+        $product->update($data);
 
         return response()->json([
             'message' => 'Product updated successfully.',
-            'data' => $product->load(['category', 'supplier']),
+            'data' => $product->load(['category', 'supplier', 'region']),
         ], 200);
     }
 
@@ -132,13 +154,18 @@ class ProductController extends Controller
             ], 404);
         }
 
+        $isActive = $request->boolean('is_active');
+
         $product->update([
-            'is_active' => $request->boolean('is_active'),
+            'is_active' => $isActive,
+            'is_deleted' => $request->has('is_deleted')
+                ? $request->boolean('is_deleted')
+                : ($isActive ? false : $product->is_deleted),
         ]);
 
         return response()->json([
             'message' => 'Product status updated successfully.',
-            'data' => $product->load(['category', 'supplier']),
+            'data' => $product->load(['category', 'supplier', 'region']),
         ], 200);
     }
 
@@ -156,26 +183,11 @@ class ProductController extends Controller
             ], 404);
         }
 
-        $hasRelatedData =
-            DB::table('cart_items')->where('product_id', $id)->exists() ||
-            DB::table('order_items')->where('product_id', $id)->exists() ||
-            DB::table('reviews')->where('product_id', $id)->exists() ||
-            DB::table('complaints')->where('product_id', $id)->exists() ||
-            DB::table('inventory_items')->where('product_id', $id)->exists() ||
-            DB::table('supply_order_items')->where('product_id', $id)->exists() ||
-            DB::table('delivery_requests')->where('product_id', $id)->exists() ||
-            DB::table('prices')->where('product_id', $id)->exists();
-
-        if ($hasRelatedData) {
-            return response()->json([
-                'message' => 'Product has related data and cannot be deleted. Deactivate it instead.',
-            ], 422);
-        }
-
-        $product->delete();
+        $product->markDeleted();
 
         return response()->json([
             'message' => 'Product deleted successfully.',
+            'data' => $product->refresh()->load(['category', 'supplier', 'region']),
         ], 200);
     }
 }

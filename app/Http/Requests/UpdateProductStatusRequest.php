@@ -18,6 +18,7 @@ class UpdateProductStatusRequest extends FormRequest
     {
         return [
             'is_active' => ['required', 'boolean'],
+            'is_deleted' => ['nullable', 'boolean'],
         ];
     }
 
