@@ -1,108 +1,91 @@
 # 5_9_TMDT Backend
 
-Backend Laravel cho dự án thương mại điện tử nông sản.
+Laravel API backend for the 5_9_TMDT ecommerce project.
 
-## 1. Yêu cầu môi trường
+The React admin/customer frontend is a separate project in `../5_9_TMDT_Frontend`.
+This backend does not build or serve frontend assets.
+
+## Requirements
 
 - PHP >= 8.2
 - Composer
-- Node.js >= 18 và npm
 - MySQL 8+
 
-## 2. Cài đặt dự án
+## Install
 
-Mở terminal trong thư mục gốc dự án, sau đó chạy:
+Run these commands from `5_9_TMDT_Backend`:
 
 ```bash
 composer install
-npm install
-```
-
-## 3. Cấu hình biến môi trường
-
-Tạo file `.env` từ file mẫu:
-
-```bash
 copy .env.example .env
+php artisan key:generate
 ```
 
-Sau đó cập nhật cấu hình database trong `.env`:
+Update database settings in `.env`:
 
 ```env
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=tmdt
+DB_DATABASE=ecommerce_db
 DB_USERNAME=root
 DB_PASSWORD=your_password
 ```
 
-Tiếp theo tạo application key:
+## Database
 
-```bash
-php artisan key:generate
-```
-
-## 4. Tạo database MySQL
-
-Tạo database mới trong MySQL, ví dụ:
+Create the database:
 
 ```sql
-CREATE DATABASE tmdt CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE ecommerce_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-## 5. Import schema và dữ liệu mẫu
-
-Dự án đã có sẵn 2 file SQL:
-
-- `ecommerce_schema_mysql.sql`: cấu trúc database
-- `ecommerce_seed_data.sql`: dữ liệu mẫu
-
-Chạy lần lượt các lệnh sau:
+Import the schema and seed data:
 
 ```bash
-mysql -u root -p tmdt < ecommerce_schema_mysql.sql
-mysql -u root -p tmdt < ecommerce_seed_data.sql
+mysql -u root -p ecommerce_db < ecommerce_schema_mysql.sql
+mysql -u root -p ecommerce_db < ecommerce_seed_data.sql
 ```
 
-Nếu bạn dùng user hoặc tên database khác, thay lại trong câu lệnh cho đúng.
+You can also use Laravel migrations when that fits your local workflow:
 
-## 6. Chạy dự án
+```bash
+php artisan migrate --seed
+```
 
-### Chạy Laravel server
+## Run
+
+Start the API server:
 
 ```bash
 php artisan serve
 ```
 
-Truy cập: http://127.0.0.1:8000
-
-### Chạy Vite ở môi trường phát triển
-
-```bash
-npm run dev
-```
-
-### Hoặc chạy đồng thời các dịch vụ của dự án
+Or use the Composer shortcut:
 
 ```bash
 composer run dev
 ```
 
-Lệnh trên sẽ chạy đồng thời:
+Backend health check:
 
-- Laravel development server
-- Queue listener
-- Laravel logs
-- Vite development server
+```text
+GET http://127.0.0.1:8000/
+```
 
-## 7. Chạy test
+API routes are mounted under:
+
+```text
+http://127.0.0.1:8000/api
+```
+
+## Test
 
 ```bash
 composer test
 ```
 
-Hoặc:
+or:
 
 ```bash
 php artisan test
