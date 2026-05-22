@@ -31,6 +31,13 @@ class Order extends Model
         'recipient_name',
         'recipient_phone',
         'shipping_address',
+        'shipping_line1',
+        'shipping_province_id',
+        'shipping_province_name',
+        'shipping_district_id',
+        'shipping_district_name',
+        'shipping_ward_code',
+        'shipping_ward_name',
         'payment_method',
         'status',
         'subtotal',
@@ -60,6 +67,8 @@ class Order extends Model
             'discount_amount' => 'decimal:2',
             'total_amount' => 'decimal:2',
             'stock_deducted' => 'boolean',
+            'shipping_province_id' => 'integer',
+            'shipping_district_id' => 'integer',
             'stock_deducted_at' => 'datetime',
             'shipped_at' => 'datetime',
             'delivered_at' => 'datetime',
@@ -134,5 +143,10 @@ class Order extends Model
     public function paymentStatusHistory(): HasMany
     {
         return $this->hasMany(PaymentStatusHistory::class)->orderBy('changed_at');
+    }
+
+    public function shipment(): HasOne
+    {
+        return $this->hasOne(OrderShipment::class);
     }
 }

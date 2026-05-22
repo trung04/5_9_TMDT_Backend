@@ -178,6 +178,30 @@ return [
             'description' => 'Run bulk order status actions.',
         ],
         [
+            'key' => 'admin.shipping_carriers.view',
+            'name' => 'View shipping carriers',
+            'group' => 'Shipping',
+            'description' => 'View configured shipping carriers.',
+        ],
+        [
+            'key' => 'admin.shipping_carriers.create',
+            'name' => 'Create shipping carriers',
+            'group' => 'Shipping',
+            'description' => 'Create shipping carrier records.',
+        ],
+        [
+            'key' => 'admin.shipping_carriers.update',
+            'name' => 'Update shipping carriers',
+            'group' => 'Shipping',
+            'description' => 'Update shipping carrier records.',
+        ],
+        [
+            'key' => 'admin.shipping_carriers.delete',
+            'name' => 'Delete shipping carriers',
+            'group' => 'Shipping',
+            'description' => 'Deactivate shipping carrier records.',
+        ],
+        [
             'key' => 'admin.supplier.inventory.view',
             'name' => 'View supplier inventory portal',
             'group' => 'Supplier Portal',

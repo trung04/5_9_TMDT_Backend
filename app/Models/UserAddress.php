@@ -14,6 +14,12 @@ class UserAddress extends Model
         'phone',
         'line1',
         'city',
+        'ghn_province_id',
+        'ghn_province_name',
+        'ghn_district_id',
+        'ghn_district_name',
+        'ghn_ward_code',
+        'ghn_ward_name',
         'note',
         'is_default',
     ];
@@ -22,6 +28,8 @@ class UserAddress extends Model
     {
         return [
             'is_default' => 'boolean',
+            'ghn_province_id' => 'integer',
+            'ghn_district_id' => 'integer',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

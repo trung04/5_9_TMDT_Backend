@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'ghn' => [
+        'token' => env('GHN_TOKEN'),
+        'shop_id' => env('GHN_SHOP_ID'),
+        'base_url' => env('GHN_BASE_URL', 'https://online-gateway.ghn.vn/shiip/public-api'),
+    ],
+
 ];

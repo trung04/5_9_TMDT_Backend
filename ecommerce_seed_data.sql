@@ -9,6 +9,7 @@ TRUNCATE TABLE `posts`;
 TRUNCATE TABLE `support_tickets`;
 TRUNCATE TABLE `newsletter_subscriptions`;
 TRUNCATE TABLE `payment_status_history`;
+TRUNCATE TABLE `order_shipments`;
 TRUNCATE TABLE `reviews`;
 TRUNCATE TABLE `complaints`;
 TRUNCATE TABLE `supplier_invitations`;
@@ -28,6 +29,7 @@ TRUNCATE TABLE `admin_settings`;
 TRUNCATE TABLE `admin_role_permission`;
 TRUNCATE TABLE `admin_permissions`;
 TRUNCATE TABLE `admin_roles`;
+TRUNCATE TABLE `shipping_carriers`;
 TRUNCATE TABLE `personal_access_tokens`;
 TRUNCATE TABLE `password_reset_tokens`;
 TRUNCATE TABLE `sessions`;
@@ -109,9 +111,22 @@ INSERT INTO `admin_permissions` (`id`, `key`, `name`, `group`, `description`, `c
 INSERT INTO `admin_role_permission` (`admin_role_id`, `admin_permission_id`) VALUES
 (1, 20), (1, 21), (1, 22), (1, 23), (1, 24), (1, 25), (1, 26), (1, 27), (1, 28), (1, 29), (1, 30), (1, 31), (1, 32), (1, 33), (1, 34), (1, 35), (1, 36), (1, 37), (1, 38);
 
+INSERT INTO `admin_permissions` (`id`, `key`, `name`, `group`, `description`, `created_at`, `updated_at`) VALUES
+(39, 'admin.shipping_carriers.view', 'View shipping carriers', 'Shipping', 'View configured shipping carriers.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(40, 'admin.shipping_carriers.create', 'Create shipping carriers', 'Shipping', 'Create shipping carrier records.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(41, 'admin.shipping_carriers.update', 'Update shipping carriers', 'Shipping', 'Update shipping carrier records.', '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(42, 'admin.shipping_carriers.delete', 'Delete shipping carriers', 'Shipping', 'Deactivate shipping carrier records.', '2026-01-01 08:00:00', '2026-01-01 08:00:00');
+
+INSERT INTO `admin_role_permission` (`admin_role_id`, `admin_permission_id`) VALUES
+(1, 39), (1, 40), (1, 41), (1, 42);
+
 UPDATE `users`
 SET `admin_role_id` = 1
 WHERE `email` = 'admin@shop.local' AND `role` = 'ADMIN';
+
+INSERT INTO `shipping_carriers` (`id`, `code`, `name`, `provider`, `tracking_url_template`, `default_weight`, `default_length`, `default_width`, `default_height`, `default_service_type_id`, `default_payment_type_id`, `default_required_note`, `pickup_name`, `pickup_phone`, `pickup_address`, `pickup_ward_code`, `pickup_ward_name`, `pickup_district_id`, `pickup_district_name`, `pickup_province_id`, `pickup_province_name`, `settings`, `is_active`, `is_deleted`, `created_at`, `updated_at`) VALUES
+(1, 'GHN', 'Giao Hang Nhanh', 'GHN', 'https://donhang.ghn.vn/?order_code={code}', 1000, 20, 20, 10, 2, 1, 'KHONGCHOXEMHANG', 'Heritage Harvest', '0900000999', 'Kho chinh Ha Noi', NULL, 'Phuong Dich Vong Hau', NULL, 'Quan Cau Giay', NULL, 'Ha Noi', JSON_OBJECT('shop_id_configured', TRUE), TRUE, FALSE, '2026-01-01 08:00:00', '2026-01-01 08:00:00'),
+(2, 'MANUAL', 'Van chuyen thu cong', 'MANUAL', NULL, 1000, 20, 20, 10, 2, 1, 'KHONGCHOXEMHANG', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, TRUE, FALSE, '2026-01-01 08:00:00', '2026-01-01 08:00:00');
 
 INSERT INTO `user_addresses` (`id`, `user_id`, `label`, `recipient`, `phone`, `line1`, `city`, `note`, `is_default`, `created_at`, `updated_at`) VALUES
 (1, 2, 'Nhà riêng', 'Trần Thị Customer', '0900000002', '101 Lê Duẩn', 'Hà Nội', 'Giao sau 18h nếu có thể.', TRUE, '2026-01-03 09:00:00', '2026-01-03 09:00:00'),
@@ -171,6 +186,10 @@ INSERT INTO `orders` (`id`, `user_id`, `order_no`, `recipient_name`, `recipient_
 (1, 2, 'ORD-20260001', 'Trần Thị Customer', '0900000002', '101 Lê Duẩn, Hà Nội', 'COD', 'DELIVERED', 619000.00, 30000.00, 0.00, 649000.00, TRUE, '2026-02-05 08:10:00', 'GHN', 'GHN-ORD-20260001', '2026-02-06 08:00:00', '2026-02-07 17:00:00', NULL, 'Giao giờ hành chính, đóng gói cẩn thận.', '2026-02-05 08:00:00', '2026-02-07 17:00:00'),
 (2, 5, 'ORD-20260002', 'Đỗ Minh Khách', '0900000005', '22 Điện Biên Phủ, TP.HCM', 'BANK_TRANSFER', 'CONFIRMED', 489000.00, 0.00, 30000.00, 459000.00, TRUE, '2026-02-10 09:30:00', NULL, NULL, NULL, NULL, NULL, 'Khách đã chuyển khoản, đơn hàng làm quà tặng.', '2026-02-10 09:00:00', '2026-02-10 09:30:00'),
 (3, 2, 'ORD-20260003', 'Trần Thị Customer', '0900000002', '101 Lê Duẩn, Hà Nội', 'COD', 'SHIPPED', 388000.00, 25000.00, 13000.00, 400000.00, TRUE, '2026-02-12 14:15:00', 'GHTK', 'GHTK-ORD-20260003', '2026-02-13 08:00:00', NULL, NULL, 'Giao nhanh trong ngày nếu kịp tuyến.', '2026-02-12 14:00:00', '2026-02-13 08:00:00');
+
+INSERT INTO `order_shipments` (`id`, `order_id`, `shipping_carrier_id`, `provider`, `status`, `tracking_code`, `tracking_url`, `service_type_id`, `payment_type_id`, `required_note`, `weight`, `length`, `width`, `height`, `shipping_fee`, `cod_amount`, `expected_delivery_time`, `raw_request`, `raw_response`, `synced_at`, `cancelled_at`, `created_by_user_id`, `updated_by_user_id`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, 'GHN', 'delivered', 'GHN-ORD-20260001', 'https://donhang.ghn.vn/?order_code=GHN-ORD-20260001', 2, 1, 'KHONGCHOXEMHANG', 1000, 20, 20, 10, 30000.00, 649000.00, NULL, JSON_OBJECT('seeded', TRUE), JSON_OBJECT('seeded', TRUE, 'status', 'delivered'), '2026-02-07 17:00:00', NULL, 1, 1, '2026-02-05 10:00:00', '2026-02-07 17:00:00'),
+(2, 3, 2, 'MANUAL', 'shipping', 'GHTK-ORD-20260003', NULL, NULL, NULL, NULL, 1000, 20, 20, 10, 25000.00, 400000.00, NULL, NULL, JSON_OBJECT('seeded', TRUE, 'status', 'shipping'), '2026-02-13 08:00:00', NULL, 3, 3, '2026-02-12 17:00:00', '2026-02-13 08:00:00');
 
 INSERT INTO `order_items` (`id`, `order_id`, `product_id`, `product_name_snapshot`, `quantity`, `unit_price`, `line_total`, `created_at`, `updated_at`) VALUES
 (1, 1, 1, 'Trà Tân Cương Thái Nguyên 200g', 1, 229000.00, 229000.00, '2026-02-05 08:05:00', '2026-02-05 08:05:00'),

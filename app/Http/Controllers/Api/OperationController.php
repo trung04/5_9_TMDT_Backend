@@ -11,6 +11,7 @@ use App\Models\PaymentStatusHistory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class OperationController extends Controller
 {
@@ -311,6 +312,11 @@ class OperationController extends Controller
                 'created_at' => optional($history->changed_at)->toISOString(),
             ])->values(),
             'assigned_warehouse_zone' => $this->zoneFor((int) $order->id),
+            'shipment' => $order->shipment ? [
+                'tracking_code' => $order->shipment->tracking_code,
+                'status' => $order->shipment->status,
+                'provider' => $order->shipment->provider,
+            ] : null,
         ];
     }
 
@@ -347,10 +353,28 @@ class OperationController extends Controller
             'updated_at' => now(),
         ];
 
+        if ($nextStatus === Order::STATUS_PACKED) {
+            $order->loadMissing('shipment');
+
+            if (! $order->shipment || $order->shipment->cancelled_at || ! $order->shipment->tracking_code) {
+                throw ValidationException::withMessages([
+                    'shipment' => ['Can tao van don truoc khi chuyen don sang trang thai dong goi.'],
+                ]);
+            }
+        }
+
         if ($nextStatus === Order::STATUS_SHIPPED && ! $order->shipped_at) {
+            $order->loadMissing('shipment');
+
+            if (! $order->shipment || $order->shipment->cancelled_at || ! $order->shipment->tracking_code) {
+                throw ValidationException::withMessages([
+                    'shipment' => ['Can tao van don truoc khi ban giao cho van chuyen.'],
+                ]);
+            }
+
             $updates['shipped_at'] = now();
-            $updates['shipping_carrier'] = $order->shipping_carrier ?: 'GHN';
-            $updates['shipping_code'] = $order->shipping_code ?: "GHN-{$order->order_no}";
+            $updates['shipping_carrier'] = $order->shipping_carrier ?: $order->shipment->carrier?->name;
+            $updates['shipping_code'] = $order->shipping_code ?: $order->shipment->tracking_code;
         }
 
         if ($nextStatus === Order::STATUS_DELIVERED) {

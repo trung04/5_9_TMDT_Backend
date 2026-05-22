@@ -372,6 +372,12 @@ class AccountService
             'phone' => $address->phone,
             'line1' => $address->line1,
             'city' => $address->city,
+            'ghn_province_id' => $address->ghn_province_id,
+            'ghn_province_name' => $address->ghn_province_name,
+            'ghn_district_id' => $address->ghn_district_id,
+            'ghn_district_name' => $address->ghn_district_name,
+            'ghn_ward_code' => $address->ghn_ward_code,
+            'ghn_ward_name' => $address->ghn_ward_name,
             'note' => $address->note,
             'is_default' => (bool) $address->is_default,
         ];
@@ -407,7 +413,7 @@ class AccountService
     {
         $user->update([
             'address' => $address->line1,
-            'city' => $address->city,
+            'city' => $address->ghn_province_name ?: $address->city,
         ]);
     }
 

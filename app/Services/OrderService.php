@@ -19,12 +19,16 @@ use Illuminate\Validation\ValidationException;
 
 class OrderService
 {
+    public function __construct(private readonly OrderShipmentService $shipmentService)
+    {
+    }
+
     /**
      * @var array<string, list<string>>
      */
     private const ORDER_TRANSITIONS = [
         Order::STATUS_PENDING => [Order::STATUS_CONFIRMED, Order::STATUS_CANCELLED],
-        Order::STATUS_CONFIRMED => [Order::STATUS_PACKED, Order::STATUS_CANCELLED],
+        Order::STATUS_CONFIRMED => [Order::STATUS_CANCELLED],
         Order::STATUS_PACKED => [Order::STATUS_SHIPPED, Order::STATUS_CANCELLED],
         Order::STATUS_SHIPPED => [Order::STATUS_DELIVERED, Order::STATUS_DELIVERY_FAILED],
         Order::STATUS_DELIVERY_FAILED => [Order::STATUS_CANCELLED, Order::STATUS_SHIPPED],
@@ -49,10 +53,6 @@ class OrderService
         'CONFIRM' => [
             'status' => Order::STATUS_CONFIRMED,
             'success_message' => 'Đã xác nhận đơn và trừ kho.',
-        ],
-        'PACK' => [
-            'status' => Order::STATUS_PACKED,
-            'success_message' => 'Đã chuyển đơn sang trạng thái đã đóng gói.',
         ],
         'SHIP' => [
             'status' => Order::STATUS_SHIPPED,
@@ -141,7 +141,8 @@ class OrderService
                 $subtotal += $lineTotal;
             }
 
-            $shippingFee = $this->calculateShippingFee($subtotal, (string) $attributes['shipping_address']);
+            $shippingAddress = $this->shippingAddressFromAttributes($attributes);
+            $shippingFee = $this->calculateShippingFee($subtotal, $shippingAddress);
             $discountAmount = 0.0;
             $totalAmount = max(0, $subtotal + $shippingFee - $discountAmount);
             $paymentMethod = $attributes['payment_method'] ?? Order::PAYMENT_METHOD_COD;
@@ -153,7 +154,14 @@ class OrderService
                 'order_no' => $orderNo,
                 'recipient_name' => $attributes['recipient_name'],
                 'recipient_phone' => $attributes['recipient_phone'],
-                'shipping_address' => $attributes['shipping_address'],
+                'shipping_address' => $shippingAddress,
+                'shipping_line1' => ! empty($attributes['shipping_line1']) ? $attributes['shipping_line1'] : null,
+                'shipping_province_id' => $attributes['shipping_province_id'] ?? null,
+                'shipping_province_name' => ! empty($attributes['shipping_province_name']) ? $attributes['shipping_province_name'] : null,
+                'shipping_district_id' => $attributes['shipping_district_id'] ?? null,
+                'shipping_district_name' => ! empty($attributes['shipping_district_name']) ? $attributes['shipping_district_name'] : null,
+                'shipping_ward_code' => ! empty($attributes['shipping_ward_code']) ? $attributes['shipping_ward_code'] : null,
+                'shipping_ward_name' => ! empty($attributes['shipping_ward_name']) ? $attributes['shipping_ward_name'] : null,
                 'payment_method' => $paymentMethod,
                 'status' => Order::STATUS_PENDING,
                 'subtotal' => $this->decimal($subtotal),
@@ -228,7 +236,7 @@ class OrderService
     {
         return Order::query()
             ->where('user_id', $user->id)
-            ->with(['items', 'payment'])
+            ->with(['items', 'payment', 'shipment.carrier'])
             ->orderByDesc('id')
             ->paginate($perPage);
     }
@@ -245,7 +253,7 @@ class OrderService
     public function listAdminOrders(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
         $query = Order::query()
-            ->with(['user', 'items', 'payment'])
+            ->with(['user', 'items', 'payment', 'shipment.carrier'])
             ->orderByDesc('id');
 
         if (! empty($filters['status'])) {
@@ -343,7 +351,7 @@ class OrderService
         return DB::transaction(function () use ($order, $actor, $reason, $note): Order {
             $lockedOrder = Order::query()
                 ->where('id', $order->id)
-                ->with(['items', 'payment'])
+                ->with(['items', 'payment', 'shipment'])
                 ->lockForUpdate()
                 ->firstOrFail();
 
@@ -397,6 +405,10 @@ class OrderService
                 $this->ensureOrderCanBeDelivered($lockedOrder);
             }
 
+            if ($nextStatus === Order::STATUS_SHIPPED) {
+                $this->ensureOrderHasShipmentBeforeShipping($lockedOrder);
+            }
+
             if ($nextStatus === Order::STATUS_CANCELLED) {
                 $this->cancelOrderByAdmin($lockedOrder, $actor, $currentStatus, $note, $options);
 
@@ -406,8 +418,9 @@ class OrderService
             $updatePayload = ['status' => $nextStatus];
 
             if ($nextStatus === Order::STATUS_SHIPPED) {
-                $updatePayload['shipping_code'] = $lockedOrder->shipping_code ?: $this->generateShippingCode();
-                $updatePayload['shipping_carrier'] = $lockedOrder->shipping_carrier ?: 'Giao hang mo phong';
+                $shipment = $lockedOrder->shipment;
+                $updatePayload['shipping_code'] = $lockedOrder->shipping_code ?: $shipment?->tracking_code;
+                $updatePayload['shipping_carrier'] = $lockedOrder->shipping_carrier ?: $shipment?->carrier?->name;
                 $updatePayload['shipped_at'] = now();
             }
 
@@ -575,7 +588,7 @@ class OrderService
      */
     public function orderSummaryPayload(Order $order): array
     {
-        $order->loadMissing(['user', 'items', 'payment']);
+        $order->loadMissing(['user', 'items', 'payment', 'shipment.carrier']);
 
         return [
             'id' => $order->id,
@@ -584,6 +597,13 @@ class OrderService
             'status' => $order->status,
             'subtotal' => $order->subtotal,
             'shipping_fee' => $order->shipping_fee,
+            'shipping_line1' => $order->shipping_line1,
+            'shipping_province_id' => $order->shipping_province_id,
+            'shipping_province_name' => $order->shipping_province_name,
+            'shipping_district_id' => $order->shipping_district_id,
+            'shipping_district_name' => $order->shipping_district_name,
+            'shipping_ward_code' => $order->shipping_ward_code,
+            'shipping_ward_name' => $order->shipping_ward_name,
             'discount_amount' => $order->discount_amount,
             'total_amount' => $order->total_amount,
             'stock_deducted' => (bool) $order->stock_deducted,
@@ -596,6 +616,7 @@ class OrderService
             'item_count' => $order->items->count(),
             'customer' => $order->user ? $this->customerPayload($order->user) : null,
             'payment' => $order->payment ? $this->paymentPayload($order->payment) : null,
+            'shipment' => $this->shipmentService->shipmentPayload($order->shipment),
             'created_at' => $order->created_at,
             'updated_at' => $order->updated_at,
         ];
@@ -614,6 +635,13 @@ class OrderService
             'recipient_name' => $order->recipient_name,
             'recipient_phone' => $order->recipient_phone,
             'shipping_address' => $order->shipping_address,
+            'shipping_line1' => $order->shipping_line1,
+            'shipping_province_id' => $order->shipping_province_id,
+            'shipping_province_name' => $order->shipping_province_name,
+            'shipping_district_id' => $order->shipping_district_id,
+            'shipping_district_name' => $order->shipping_district_name,
+            'shipping_ward_code' => $order->shipping_ward_code,
+            'shipping_ward_name' => $order->shipping_ward_name,
             'payment_method' => $order->payment_method,
             'status' => $order->status,
             'subtotal' => $order->subtotal,
@@ -636,6 +664,7 @@ class OrderService
             'customer' => $order->user ? $this->customerPayload($order->user) : null,
             'items' => $order->items->map(fn (OrderItem $item): array => $this->orderItemPayload($item))->values()->all(),
             'payment' => $order->payment ? $this->paymentPayload($order->payment) : null,
+            'shipment' => $this->shipmentService->shipmentPayload($order->shipment),
             'status_history' => $order->statusHistory->map(
                 fn (OrderStatusHistory $history): array => $this->statusHistoryPayload($history)
             )->values()->all(),
@@ -775,7 +804,20 @@ class OrderService
      */
     public function allowedNextStatuses(Order $order): array
     {
-        return self::ORDER_TRANSITIONS[$order->status] ?? [];
+        $allowed = self::ORDER_TRANSITIONS[$order->status] ?? [];
+
+        if (in_array(Order::STATUS_SHIPPED, $allowed, true)) {
+            $order->loadMissing('shipment');
+
+            if (! $order->shipment || $order->shipment->cancelled_at) {
+                $allowed = array_values(array_filter(
+                    $allowed,
+                    fn (string $status): bool => $status !== Order::STATUS_SHIPPED
+                ));
+            }
+        }
+
+        return $allowed;
     }
 
     /**
@@ -800,6 +842,17 @@ class OrderService
         if (! in_array($nextStatus, $this->allowedNextStatuses($order), true)) {
             throw ValidationException::withMessages([
                 'status' => ['Khong the chuyen don hang sang trang thai da chon.'],
+            ]);
+        }
+    }
+
+    private function ensureOrderHasShipmentBeforeShipping(Order $order): void
+    {
+        $order->loadMissing('shipment');
+
+        if (! $order->shipment || $order->shipment->cancelled_at || ! $order->shipment->tracking_code) {
+            throw ValidationException::withMessages([
+                'shipment' => ['Can tao van don truoc khi ban giao cho van chuyen.'],
             ]);
         }
     }
@@ -982,6 +1035,8 @@ class OrderService
         if ($shouldRestock) {
             $this->restoreStock($order);
         }
+
+        $this->shipmentService->cancelActiveShipmentForOrder($order, $actor);
 
         $order->update([
             'status' => Order::STATUS_CANCELLED,
@@ -1191,6 +1246,22 @@ class OrderService
         return 45000.0;
     }
 
+    private function shippingAddressFromAttributes(array $attributes): string
+    {
+        if (empty($attributes['shipping_line1'])) {
+            return (string) $attributes['shipping_address'];
+        }
+
+        return collect([
+            $attributes['shipping_line1'] ?? null,
+            $attributes['shipping_ward_name'] ?? null,
+            $attributes['shipping_district_name'] ?? null,
+            $attributes['shipping_province_name'] ?? null,
+        ])
+            ->filter(fn ($part): bool => is_string($part) && trim($part) !== '')
+            ->implode(', ') ?: (string) $attributes['shipping_address'];
+    }
+
     private function normalizeText(string $value): string
     {
         $normalized = mb_strtolower(trim($value), 'UTF-8');
@@ -1240,6 +1311,7 @@ class OrderService
             'user',
             'items' => fn ($query) => $query->orderBy('id'),
             'payment',
+            'shipment.carrier',
             'statusHistory' => fn ($query) => $query->orderBy('changed_at'),
             'paymentStatusHistory' => fn ($query) => $query->orderBy('changed_at'),
         ];

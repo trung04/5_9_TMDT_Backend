@@ -5,14 +5,17 @@ use App\Http\Controllers\Api\Admin\AccessController as AdminAccessController;
 use App\Http\Controllers\Api\Admin\CommunityController as AdminCommunityController;
 use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
+use App\Http\Controllers\Api\Admin\OrderShipmentController as AdminOrderShipmentController;
 use App\Http\Controllers\Api\Admin\PostController as AdminPostController;
 use App\Http\Controllers\Api\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Api\Admin\SettingsController as AdminSettingsController;
+use App\Http\Controllers\Api\Admin\ShippingCarrierController as AdminShippingCarrierController;
 use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ComplaintController;
+use App\Http\Controllers\Api\GhnLocationController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\NewsletterSubscriptionController;
 use App\Http\Controllers\Api\OperationController;
@@ -33,6 +36,9 @@ Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/{id}', [ProductController::class, 'show']);
 Route::get('/regions', [RegionController::class, 'index']);
 Route::post('/newsletter-subscriptions', [NewsletterSubscriptionController::class, 'store']);
+Route::get('/shipping/ghn/provinces', [GhnLocationController::class, 'provinces']);
+Route::get('/shipping/ghn/districts', [GhnLocationController::class, 'districts']);
+Route::get('/shipping/ghn/wards', [GhnLocationController::class, 'wards']);
 
 // Public post APIs
 Route::get('/posts', [PostController::class, 'index']);
@@ -110,6 +116,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::patch('/posts/comments/{comment}/visibility', [AdminPostController::class, 'updateCommentVisibility']);
         Route::get('/settings', [AdminSettingsController::class, 'show']);
         Route::put('/settings', [AdminSettingsController::class, 'update']);
+        Route::get('/shipping-carriers', [AdminShippingCarrierController::class, 'index']);
+        Route::post('/shipping-carriers', [AdminShippingCarrierController::class, 'store']);
+        Route::put('/shipping-carriers/{carrier}', [AdminShippingCarrierController::class, 'update']);
+        Route::delete('/shipping-carriers/{carrier}', [AdminShippingCarrierController::class, 'destroy']);
         Route::get('/users', [AdminUserController::class, 'index']);
         Route::get('/users/{user}', [AdminUserController::class, 'show']);
         Route::post('/users', [AdminUserController::class, 'store']);
@@ -141,6 +151,9 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('/orders/bulk-status', [AdminOrderController::class, 'bulkUpdateStatus']);
         Route::patch('/orders/{order}/status', [AdminOrderController::class, 'updateStatus']);
         Route::patch('/orders/{order}/payment-status', [AdminOrderController::class, 'updatePaymentStatus']);
+        Route::post('/orders/{order}/shipment', [AdminOrderShipmentController::class, 'store']);
+        Route::post('/orders/{order}/shipment/sync', [AdminOrderShipmentController::class, 'sync']);
+        Route::delete('/orders/{order}/shipment', [AdminOrderShipmentController::class, 'destroy']);
     });
 
     // Admin Category Routes
