@@ -5,14 +5,17 @@ use App\Http\Controllers\Api\Admin\AccessController as AdminAccessController;
 use App\Http\Controllers\Api\Admin\CommunityController as AdminCommunityController;
 use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
+use App\Http\Controllers\Api\Admin\PostController as AdminPostController;
 use App\Http\Controllers\Api\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Api\Admin\SettingsController as AdminSettingsController;
+use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ComplaintController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\PostController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SupplierController;
 use Illuminate\Support\Facades\Route;
@@ -24,6 +27,9 @@ Route::post('/login', [AuthController::class, 'login']);
 // Public product APIs
 Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/{id}', [ProductController::class, 'show']);
+
+// Public post APIs
+Route::get('/posts', [PostController::class, 'index']);
 
 // Public Category Routes
 Route::get('/categories', [CategoryController::class, 'index']);
@@ -55,6 +61,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markRead']);
     Route::get('/complaints', [ComplaintController::class, 'index']);
     Route::post('/complaints', [ComplaintController::class, 'store']);
+    Route::get('/posts/my-likes', [PostController::class, 'myLikes']);
+    Route::post('/posts/{post}/comments', [PostController::class, 'storeComment']);
+    Route::post('/posts/{post}/likes', [PostController::class, 'like']);
+    Route::delete('/posts/{post}/likes', [PostController::class, 'unlike']);
 
     // Customer Cart & Order Routes
     Route::get('/cart', [CartController::class, 'show']);
@@ -72,8 +82,18 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/dashboard', [AdminDashboardController::class, 'show']);
         Route::get('/community', [AdminCommunityController::class, 'index']);
         Route::post('/community/invitations', [AdminCommunityController::class, 'storeInvitation']);
+        Route::get('/posts', [AdminPostController::class, 'index']);
+        Route::post('/posts', [AdminPostController::class, 'store']);
+        Route::put('/posts/{post}', [AdminPostController::class, 'update']);
+        Route::delete('/posts/{post}', [AdminPostController::class, 'destroy']);
+        Route::patch('/posts/comments/{comment}/visibility', [AdminPostController::class, 'updateCommentVisibility']);
         Route::get('/settings', [AdminSettingsController::class, 'show']);
         Route::put('/settings', [AdminSettingsController::class, 'update']);
+        Route::get('/users', [AdminUserController::class, 'index']);
+        Route::get('/users/{user}', [AdminUserController::class, 'show']);
+        Route::post('/users', [AdminUserController::class, 'store']);
+        Route::put('/users/{user}', [AdminUserController::class, 'update']);
+        Route::delete('/users/{user}', [AdminUserController::class, 'destroy']);
 
         Route::prefix('access')->group(function (): void {
             Route::get('/permissions', [AdminAccessController::class, 'permissions']);

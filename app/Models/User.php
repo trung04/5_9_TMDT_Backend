@@ -205,6 +205,21 @@ class User extends Authenticatable
         return $this->hasMany(WishlistItem::class);
     }
 
+    public function posts(): HasMany
+    {
+        return $this->hasMany(Post::class, 'created_by_user_id');
+    }
+
+    public function postComments(): HasMany
+    {
+        return $this->hasMany(PostComment::class);
+    }
+
+    public function postLikes(): HasMany
+    {
+        return $this->hasMany(PostLike::class);
+    }
+
     public function adminSetting(): HasOne
     {
         return $this->hasOne(AdminSetting::class);
