@@ -241,14 +241,36 @@ CREATE TABLE IF NOT EXISTS `suppliers` (
   KEY `idx_suppliers_active_deleted` (`is_active`, `is_deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `regions` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `slug` VARCHAR(120) NOT NULL,
+  `name` VARCHAR(120) NOT NULL,
+  `description` TEXT NULL,
+  `image_url` TEXT NULL,
+  `is_active` BOOLEAN NOT NULL DEFAULT TRUE,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_regions_slug` (`slug`),
+  UNIQUE KEY `uk_regions_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `products` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `category_id` BIGINT UNSIGNED NOT NULL,
   `supplier_id` BIGINT UNSIGNED NULL,
+  `region_id` BIGINT UNSIGNED NULL,
   `sku` VARCHAR(80) NOT NULL,
+  `slug` VARCHAR(180) NULL,
   `name` VARCHAR(180) NOT NULL,
   `description` TEXT NULL,
+  `short_description` TEXT NULL,
   `image_url` TEXT NULL,
+  `origin` VARCHAR(180) NULL,
+  `weight` VARCHAR(80) NULL,
+  `shelf_life` VARCHAR(120) NULL,
+  `certifications` JSON NULL,
+  `gallery` JSON NULL,
   `sale_price` DECIMAL(15,2) NOT NULL,
   `stock_quantity` INT UNSIGNED NOT NULL DEFAULT 0,
   `is_active` BOOLEAN NOT NULL DEFAULT TRUE,
@@ -257,13 +279,17 @@ CREATE TABLE IF NOT EXISTS `products` (
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_products_sku` (`sku`),
+  UNIQUE KEY `uk_products_slug` (`slug`),
   KEY `idx_products_category_active_deleted` (`category_id`, `is_active`, `is_deleted`),
   KEY `idx_products_supplier_active_deleted` (`supplier_id`, `is_active`, `is_deleted`),
+  KEY `idx_products_region_id` (`region_id`),
   CONSTRAINT `chk_products_sale_price_nonnegative` CHECK (`sale_price` >= 0),
   CONSTRAINT `fk_products_category`
     FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `fk_products_supplier`
-    FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE SET NULL
+    FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_products_region`
+    FOREIGN KEY (`region_id`) REFERENCES `regions` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `prices` (
@@ -651,4 +677,91 @@ CREATE TABLE IF NOT EXISTS `supplier_invitations` (
   KEY `idx_supplier_invitations_created_by_user_id` (`created_by_user_id`),
   CONSTRAINT `fk_supplier_invitations_created_by_user`
     FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `posts` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `created_by_user_id` BIGINT UNSIGNED NULL,
+  `title` VARCHAR(180) NOT NULL,
+  `excerpt` TEXT NULL,
+  `body` LONGTEXT NOT NULL,
+  `cover_image_url` TEXT NULL,
+  `status` VARCHAR(40) NOT NULL DEFAULT 'DRAFT',
+  `published_at` DATETIME NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_posts_status_published_at` (`status`, `published_at`),
+  KEY `idx_posts_created_by_status` (`created_by_user_id`, `status`),
+  CONSTRAINT `fk_posts_created_by_user`
+    FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `post_comments` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `post_id` BIGINT UNSIGNED NOT NULL,
+  `user_id` BIGINT UNSIGNED NOT NULL,
+  `content` TEXT NOT NULL,
+  `status` VARCHAR(40) NOT NULL DEFAULT 'VISIBLE',
+  `hidden_by_user_id` BIGINT UNSIGNED NULL,
+  `hidden_at` DATETIME NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_post_comments_post_status_created` (`post_id`, `status`, `created_at`),
+  KEY `idx_post_comments_user_created` (`user_id`, `created_at`),
+  KEY `idx_post_comments_hidden_by_user_id` (`hidden_by_user_id`),
+  CONSTRAINT `fk_post_comments_post`
+    FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_post_comments_user`
+    FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_post_comments_hidden_by_user`
+    FOREIGN KEY (`hidden_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `post_likes` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `post_id` BIGINT UNSIGNED NOT NULL,
+  `user_id` BIGINT UNSIGNED NOT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_post_likes_post_user` (`post_id`, `user_id`),
+  KEY `idx_post_likes_user_created` (`user_id`, `created_at`),
+  CONSTRAINT `fk_post_likes_post`
+    FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_post_likes_user`
+    FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `newsletter_subscriptions` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `email` VARCHAR(160) NOT NULL,
+  `source` VARCHAR(80) NOT NULL DEFAULT 'storefront',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_newsletter_subscriptions_email_source` (`email`, `source`),
+  KEY `idx_newsletter_subscriptions_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `support_tickets` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT UNSIGNED NULL,
+  `subject` VARCHAR(180) NOT NULL,
+  `message` TEXT NOT NULL,
+  `channel` VARCHAR(30) NOT NULL,
+  `status` VARCHAR(30) NOT NULL DEFAULT 'OPEN',
+  `resolved_by_user_id` BIGINT UNSIGNED NULL,
+  `resolved_at` DATETIME NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_support_tickets_channel_status` (`channel`, `status`),
+  KEY `idx_support_tickets_user_id` (`user_id`),
+  KEY `idx_support_tickets_resolved_by_user_id` (`resolved_by_user_id`),
+  CONSTRAINT `fk_support_tickets_user`
+    FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_support_tickets_resolved_by_user`
+    FOREIGN KEY (`resolved_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
