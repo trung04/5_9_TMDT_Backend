@@ -19,39 +19,61 @@ class OperationController extends Controller
 
     public function inventory(Request $request): JsonResponse
     {
-        $items = DB::table('inventory_items')
-            ->join('inventories', 'inventories.id', '=', 'inventory_items.inventory_id')
-            ->join('products', 'products.id', '=', 'inventory_items.product_id')
+        $inventoryMetaSubquery = DB::table('inventory_items')
+            ->leftJoin('inventories', 'inventories.id', '=', 'inventory_items.inventory_id')
+            ->selectRaw('
+                inventory_items.product_id,
+                MIN(inventories.name) as inventory_name,
+                MIN(inventories.location) as inventory_location,
+                MAX(inventory_items.reorder_level) as reorder_level,
+                MAX(inventory_items.safety_stock) as safety_stock,
+                MAX(inventory_items.last_counted_at) as last_counted_at,
+                MAX(inventory_items.updated_at) as inventory_updated_at
+            ')
+            ->groupBy('inventory_items.product_id');
+
+        $latestPriceSubquery = DB::table('prices')
+            ->selectRaw('product_id, MAX(id) as latest_price_id')
+            ->where('is_active', true)
+            ->groupBy('product_id');
+
+        $lowStockThreshold = (int) (DB::table('admin_settings')->value('low_stock_threshold') ?? 5);
+
+        $items = DB::table('products')
             ->leftJoin('suppliers', 'suppliers.id', '=', 'products.supplier_id')
-            ->leftJoin('prices', function ($join): void {
-                $join->on('prices.product_id', '=', 'products.id')
-                    ->where('prices.is_active', true);
+            ->leftJoinSub($inventoryMetaSubquery, 'inventory_meta', function ($join): void {
+                $join->on('inventory_meta.product_id', '=', 'products.id');
             })
+            ->leftJoinSub($latestPriceSubquery, 'latest_prices', function ($join): void {
+                $join->on('latest_prices.product_id', '=', 'products.id');
+            })
+            ->leftJoin('prices as current_price', 'current_price.id', '=', 'latest_prices.latest_price_id')
             ->select([
-                'inventory_items.id',
-                'inventories.name as inventory_name',
-                'inventories.location as inventory_location',
+                'products.id',
+                'inventory_meta.inventory_name',
+                'inventory_meta.inventory_location',
                 'products.id as product_id',
                 'products.sku',
                 'products.name as product_name',
                 'products.supplier_id',
                 'suppliers.name as supplier_name',
                 'suppliers.address as supplier_location',
-                'inventory_items.quantity_on_hand',
-                'inventory_items.reorder_level',
-                'inventory_items.safety_stock',
-                'prices.cost_price',
-                'inventory_items.last_counted_at',
-                'inventory_items.updated_at',
+                'products.stock_quantity',
+                'inventory_meta.reorder_level',
+                'inventory_meta.safety_stock',
+                'current_price.cost_price',
+                'inventory_meta.last_counted_at',
+                DB::raw('COALESCE(inventory_meta.inventory_updated_at, products.updated_at) as updated_at'),
             ])
+            ->where('products.is_deleted', false)
             ->orderBy('products.sku')
             ->paginate($this->perPage($request));
 
         return response()->json(
-            $this->transformPaginator($items, function ($item): array {
-                $onHand = (int) $item->quantity_on_hand;
-                $reorder = (int) $item->reorder_level;
-                $safety = (int) $item->safety_stock;
+            $this->transformPaginator($items, function ($item) use ($lowStockThreshold): array {
+                $onHand = (int) $item->stock_quantity;
+                $reorder = (int) ($item->reorder_level ?? 5);
+                $safety = (int) ($item->safety_stock ?? 2);
 
                 return [
                     'id' => (int) $item->id,
@@ -64,12 +86,12 @@ class OperationController extends Controller
                     'inventory_name' => $item->inventory_name,
                     'inventory_location' => $item->inventory_location,
                     'quantity_on_hand' => $onHand,
-                    'reserved' => max(0, min($onHand, (int) floor($onHand * 0.12))),
+                    'reserved' => 0,
                     'reorder_level' => $reorder,
                     'safety_stock' => $safety,
                     'purchase_price' => (float) ($item->cost_price ?? 0),
                     'aisle' => $this->aisleFor((int) $item->id),
-                    'status' => $this->inventoryStatus($onHand, $reorder, $safety),
+                    'status' => $this->inventoryStatus($onHand, $lowStockThreshold),
                     'last_counted_at' => $item->last_counted_at,
                     'updated_at' => $item->updated_at,
                 ];
@@ -419,13 +441,13 @@ class OperationController extends Controller
         }
     }
 
-    private function inventoryStatus(int $onHand, int $reorder, int $safety): string
+    private function inventoryStatus(int $onHand, int $lowStockThreshold): string
     {
-        if ($onHand <= $safety) {
+        if ($onHand <= 0) {
             return 'critical';
         }
 
-        if ($onHand <= $reorder) {
+        if ($onHand <= $lowStockThreshold) {
             return 'low';
         }
 

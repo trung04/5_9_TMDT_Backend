@@ -37,7 +37,7 @@ class CreateOrderShipmentRequest extends FormRequest
             'recipient_phone' => ['nullable', 'string', 'max:20'],
             'tracking_code' => ['nullable', 'string', 'max:120'],
             'tracking_url' => ['nullable', 'string', 'max:255'],
-            'service_type_id' => ['nullable', 'integer', Rule::in([2, 5])],
+            'service_type_id' => ['nullable', 'integer', Rule::in([1, 2, 5])],
             'payment_type_id' => ['nullable', 'integer', Rule::in([1, 2])],
             'required_note' => ['nullable', 'string', Rule::in(['CHOTHUHANG', 'CHOXEMHANGKHONGTHU', 'KHONGCHOXEMHANG'])],
             'weight' => ['nullable', 'integer', 'min:1', 'max:50000'],

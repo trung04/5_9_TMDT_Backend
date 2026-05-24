@@ -136,7 +136,7 @@ class OrderController extends Controller
             'action' => [
                 'required',
                 'string',
-                Rule::in(['CONFIRM', 'SHIP', 'DELIVER', 'MARK_DELIVERY_FAILED', 'CANCEL', 'RESHIP']),
+                Rule::in(['CONFIRM', 'PACK', 'SHIP', 'DELIVER', 'MARK_DELIVERY_FAILED', 'CANCEL', 'RESHIP']),
             ],
             'note' => ['nullable', 'string', 'max:500'],
         ]);

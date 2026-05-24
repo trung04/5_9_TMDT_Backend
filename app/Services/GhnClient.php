@@ -7,6 +7,22 @@ use RuntimeException;
 
 class GhnClient
 {
+    public function isConfigured(bool $withShopId = false): bool
+    {
+        $token = trim((string) config('services.ghn.token'));
+        $baseUrl = rtrim((string) config('services.ghn.base_url'), '/');
+
+        if ($token === '' || $baseUrl === '') {
+            return false;
+        }
+
+        if (! $withShopId) {
+            return true;
+        }
+
+        return (int) config('services.ghn.shop_id') > 0;
+    }
+
     public function provinces(): array
     {
         return $this->request('GET', '/master-data/province');

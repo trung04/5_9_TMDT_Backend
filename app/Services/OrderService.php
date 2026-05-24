@@ -28,7 +28,7 @@ class OrderService
      */
     private const ORDER_TRANSITIONS = [
         Order::STATUS_PENDING => [Order::STATUS_CONFIRMED, Order::STATUS_CANCELLED],
-        Order::STATUS_CONFIRMED => [Order::STATUS_CANCELLED],
+        Order::STATUS_CONFIRMED => [Order::STATUS_PACKED, Order::STATUS_CANCELLED],
         Order::STATUS_PACKED => [Order::STATUS_SHIPPED, Order::STATUS_CANCELLED],
         Order::STATUS_SHIPPED => [Order::STATUS_DELIVERED, Order::STATUS_DELIVERY_FAILED],
         Order::STATUS_DELIVERY_FAILED => [Order::STATUS_CANCELLED, Order::STATUS_SHIPPED],
@@ -53,6 +53,10 @@ class OrderService
         'CONFIRM' => [
             'status' => Order::STATUS_CONFIRMED,
             'success_message' => 'Đã xác nhận đơn và trừ kho.',
+        ],
+        'PACK' => [
+            'status' => Order::STATUS_PACKED,
+            'success_message' => 'Da xac nhan dong goi don hang.',
         ],
         'SHIP' => [
             'status' => Order::STATUS_SHIPPED,
@@ -407,6 +411,10 @@ class OrderService
 
             if ($nextStatus === Order::STATUS_DELIVERED) {
                 $this->ensureOrderCanBeDelivered($lockedOrder);
+            }
+
+            if ($nextStatus === Order::STATUS_PACKED) {
+                $this->ensureOrderCanBePacked($lockedOrder);
             }
 
             if ($nextStatus === Order::STATUS_SHIPPED) {
@@ -853,6 +861,22 @@ class OrderService
             }
         }
 
+        if (in_array(Order::STATUS_PACKED, $allowed, true)) {
+            $order->loadMissing('shipment');
+
+            if (
+                ! $order->stock_deducted
+                || ! $order->shipment
+                || $order->shipment->cancelled_at
+                || ! $order->shipment->tracking_code
+            ) {
+                $allowed = array_values(array_filter(
+                    $allowed,
+                    fn (string $status): bool => $status !== Order::STATUS_PACKED
+                ));
+            }
+        }
+
         return $allowed;
     }
 
@@ -909,6 +933,16 @@ class OrderService
                 'payment_status' => ['Chi duoc refund khi don da bi huy hoac giao hang that bai.'],
             ]);
         }
+
+        if (
+            $order->payment_method === Order::PAYMENT_METHOD_COD
+            && $nextStatus === Payment::STATUS_SUCCESS
+            && $order->status !== Order::STATUS_DELIVERED
+        ) {
+            throw ValidationException::withMessages([
+                'payment_status' => ['Khong duoc xac nhan thanh toan COD truoc khi don giao thanh cong.'],
+            ]);
+        }
     }
 
     private function ensureOrderCanBeConfirmed(Order $order): void
@@ -953,6 +987,23 @@ class OrderService
         ) {
             throw ValidationException::withMessages([
                 'payment_status' => ['Đơn chuyển khoản chỉ được đánh dấu giao thành công khi đã xác nhận thanh toán.'],
+            ]);
+        }
+    }
+
+    private function ensureOrderCanBePacked(Order $order): void
+    {
+        if (! $order->stock_deducted) {
+            throw ValidationException::withMessages([
+                'stock' => ['Don hang chua tru kho nen chua the dong goi.'],
+            ]);
+        }
+
+        $order->loadMissing('shipment');
+
+        if (! $order->shipment || $order->shipment->cancelled_at || ! $order->shipment->tracking_code) {
+            throw ValidationException::withMessages([
+                'shipment' => ['Can tao van don truoc khi xac nhan da dong goi.'],
             ]);
         }
     }

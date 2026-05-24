@@ -35,9 +35,21 @@ class OrderShipmentService
                 ]);
             }
 
+            if ($lockedOrder->shipping_code) {
+                throw ValidationException::withMessages([
+                    'shipment' => ['Don hang da co ma van don.'],
+                ]);
+            }
+
             if ($lockedOrder->status !== Order::STATUS_CONFIRMED) {
                 throw ValidationException::withMessages([
                     'status' => ['Chi don da xac nhan moi co the tao van don.'],
+                ]);
+            }
+
+            if (! $lockedOrder->stock_deducted) {
+                throw ValidationException::withMessages([
+                    'stock' => ['Don hang chua duoc tru kho nen chua the tao van don.'],
                 ]);
             }
 
@@ -53,7 +65,7 @@ class OrderShipmentService
                 $shipment = $this->createManualShipment($lockedOrder, $carrier, $actor, $attributes);
             }
 
-            $this->moveOrderAfterShipment($lockedOrder, $shipment, $actor, $attributes['note'] ?? null);
+            $this->attachShipmentToOrder($lockedOrder, $shipment, $actor, $attributes['note'] ?? null);
 
             return $lockedOrder->refresh()->load(['items', 'payment', 'shipment.carrier', 'statusHistory', 'paymentStatusHistory', 'user.addresses']);
         });
@@ -202,6 +214,11 @@ class OrderShipmentService
     private function createGhnShipment(Order $order, ShippingCarrier $carrier, User $actor, array $attributes): OrderShipment
     {
         $this->ensureGhnAddressIsComplete($order);
+
+        if (! $this->ghnClient->isConfigured(true)) {
+            return $this->createSimulatedGhnShipment($order, $carrier, $actor, $attributes);
+        }
+
         $payload = $this->ghnCreatePayload($order, $carrier, $attributes);
         $response = $this->ghnClient->createOrder($payload);
         $data = is_array($response['data'] ?? null) ? $response['data'] : [];
@@ -240,14 +257,43 @@ class OrderShipmentService
         ]);
     }
 
+    private function createSimulatedGhnShipment(Order $order, ShippingCarrier $carrier, User $actor, array $attributes): OrderShipment
+    {
+        $trackingCode = 'GHN-' . now()->format('Ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
+        $payload = $this->ghnCreatePayload($order, $carrier, $attributes);
+
+        return OrderShipment::query()->create([
+            'order_id' => $order->id,
+            'shipping_carrier_id' => $carrier->id,
+            'provider' => 'GHN_SIMULATED',
+            'status' => OrderShipment::STATUS_CREATED,
+            'tracking_code' => $trackingCode,
+            'tracking_url' => $this->trackingUrl($carrier, $trackingCode),
+            'service_type_id' => (int) $payload['service_type_id'],
+            'payment_type_id' => (int) $payload['payment_type_id'],
+            'required_note' => (string) $payload['required_note'],
+            'weight' => (int) $payload['weight'],
+            'length' => (int) $payload['length'],
+            'width' => (int) $payload['width'],
+            'height' => (int) $payload['height'],
+            'cod_amount' => $this->decimal((float) $payload['cod_amount']),
+            'raw_request' => $payload,
+            'raw_response' => [
+                'simulated' => true,
+                'message' => 'GHN chua duoc cau hinh. He thong da tao van don mo phong.',
+            ],
+            'synced_at' => now(),
+            'created_by_user_id' => $actor->id,
+            'updated_by_user_id' => $actor->id,
+        ]);
+    }
+
     private function createManualShipment(Order $order, ShippingCarrier $carrier, User $actor, array $attributes): OrderShipment
     {
         $trackingCode = trim((string) ($attributes['tracking_code'] ?? ''));
 
         if ($trackingCode === '') {
-            throw ValidationException::withMessages([
-                'tracking_code' => ['Can nhap ma van don cho don vi van chuyen thu cong.'],
-            ]);
+            $trackingCode = 'MANUAL-' . now()->format('Ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
         }
 
         return OrderShipment::query()->create([
@@ -270,12 +316,9 @@ class OrderShipmentService
         ]);
     }
 
-    private function moveOrderAfterShipment(Order $order, OrderShipment $shipment, User $actor, ?string $note): void
+    private function attachShipmentToOrder(Order $order, OrderShipment $shipment, User $actor, ?string $note): void
     {
-        $fromStatus = $order->status;
-
         $order->update([
-            'status' => Order::STATUS_PACKED,
             'shipping_carrier' => $shipment->carrier?->name ?? $shipment->provider,
             'shipping_code' => $shipment->tracking_code,
         ]);
@@ -283,9 +326,9 @@ class OrderShipmentService
         OrderStatusHistory::query()->create([
             'order_id' => $order->id,
             'changed_by_user_id' => $actor->id,
-            'from_status' => $fromStatus,
-            'to_status' => Order::STATUS_PACKED,
-            'note' => $note ?: 'Da tao van don va chuyen don sang trang thai dong goi.',
+            'from_status' => $order->status,
+            'to_status' => $order->status,
+            'note' => $note ?: 'Da tao van don.',
             'changed_at' => now(),
         ]);
     }
