@@ -15,6 +15,8 @@ class CreateOrderShipmentRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge([
+            'recipient_name' => trim((string) $this->input('recipient_name', '')),
+            'recipient_phone' => trim((string) $this->input('recipient_phone', '')),
             'required_note' => strtoupper(trim((string) $this->input('required_note', ''))),
             'tracking_code' => trim((string) $this->input('tracking_code', '')),
             'tracking_url' => trim((string) $this->input('tracking_url', '')),
@@ -31,6 +33,8 @@ class CreateOrderShipmentRequest extends FormRequest
     {
         return [
             'shipping_carrier_id' => ['required', 'integer', 'exists:shipping_carriers,id'],
+            'recipient_name' => ['nullable', 'string', 'max:120'],
+            'recipient_phone' => ['nullable', 'string', 'max:20'],
             'tracking_code' => ['nullable', 'string', 'max:120'],
             'tracking_url' => ['nullable', 'string', 'max:255'],
             'service_type_id' => ['nullable', 'integer', Rule::in([2, 5])],

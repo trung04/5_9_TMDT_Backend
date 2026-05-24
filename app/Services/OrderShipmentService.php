@@ -9,6 +9,7 @@ use App\Models\Payment;
 use App\Models\PaymentStatusHistory;
 use App\Models\ShippingCarrier;
 use App\Models\User;
+use App\Models\UserAddress;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -24,7 +25,7 @@ class OrderShipmentService
         return DB::transaction(function () use ($order, $actor, $attributes): Order {
             $lockedOrder = Order::query()
                 ->where('id', $order->id)
-                ->with(['items', 'payment', 'shipment'])
+                ->with(['items', 'payment', 'shipment', 'user.addresses'])
                 ->lockForUpdate()
                 ->firstOrFail();
 
@@ -44,7 +45,7 @@ class OrderShipmentService
                 ->available()
                 ->findOrFail((int) $attributes['shipping_carrier_id']);
 
-            $this->applyAddressOverrides($lockedOrder, $attributes);
+            $this->applyShippingSnapshot($lockedOrder, $attributes);
 
             if ($carrier->provider === ShippingCarrier::PROVIDER_GHN) {
                 $shipment = $this->createGhnShipment($lockedOrder, $carrier, $actor, $attributes);
@@ -54,7 +55,7 @@ class OrderShipmentService
 
             $this->moveOrderAfterShipment($lockedOrder, $shipment, $actor, $attributes['note'] ?? null);
 
-            return $lockedOrder->refresh()->load(['items', 'payment', 'shipment.carrier', 'statusHistory', 'paymentStatusHistory', 'user']);
+            return $lockedOrder->refresh()->load(['items', 'payment', 'shipment.carrier', 'statusHistory', 'paymentStatusHistory', 'user.addresses']);
         });
     }
 
@@ -289,35 +290,122 @@ class OrderShipmentService
         ]);
     }
 
-    private function applyAddressOverrides(Order $order, array $attributes): void
+    private function applyShippingSnapshot(Order $order, array $attributes): void
     {
-        $keys = [
-            'shipping_line1',
-            'shipping_province_id',
-            'shipping_province_name',
-            'shipping_district_id',
-            'shipping_district_name',
-            'shipping_ward_code',
-            'shipping_ward_name',
-        ];
-        $updates = [];
+        $defaultAddress = $this->defaultAddress($order);
+        $user = $order->user;
 
-        foreach ($keys as $key) {
-            if (array_key_exists($key, $attributes) && $attributes[$key] !== null && $attributes[$key] !== '') {
-                $updates[$key] = $attributes[$key];
+        $updates = [
+            'recipient_name' => $this->firstFilled(
+                $attributes['recipient_name'] ?? null,
+                $order->recipient_name,
+                $defaultAddress?->recipient,
+                $user?->full_name,
+            ),
+            'recipient_phone' => $this->firstFilled(
+                $attributes['recipient_phone'] ?? null,
+                $order->recipient_phone,
+                $defaultAddress?->phone,
+                $user?->phone,
+            ),
+            'shipping_line1' => $this->firstFilled(
+                $attributes['shipping_line1'] ?? null,
+                $order->shipping_line1,
+                $defaultAddress?->line1,
+                $order->shipping_address,
+                $user?->address,
+            ),
+            'shipping_province_id' => $this->firstInteger(
+                $attributes['shipping_province_id'] ?? null,
+                $order->shipping_province_id,
+                $defaultAddress?->ghn_province_id,
+            ),
+            'shipping_province_name' => $this->firstFilled(
+                $attributes['shipping_province_name'] ?? null,
+                $order->shipping_province_name,
+                $defaultAddress?->ghn_province_name,
+                $defaultAddress?->city,
+                $user?->city,
+            ),
+            'shipping_district_id' => $this->firstInteger(
+                $attributes['shipping_district_id'] ?? null,
+                $order->shipping_district_id,
+                $defaultAddress?->ghn_district_id,
+            ),
+            'shipping_district_name' => $this->firstFilled(
+                $attributes['shipping_district_name'] ?? null,
+                $order->shipping_district_name,
+                $defaultAddress?->ghn_district_name,
+            ),
+            'shipping_ward_code' => $this->firstFilled(
+                $attributes['shipping_ward_code'] ?? null,
+                $order->shipping_ward_code,
+                $defaultAddress?->ghn_ward_code,
+            ),
+            'shipping_ward_name' => $this->firstFilled(
+                $attributes['shipping_ward_name'] ?? null,
+                $order->shipping_ward_name,
+                $defaultAddress?->ghn_ward_name,
+            ),
+        ];
+
+        $updates['shipping_address'] = $this->formatAddress(
+            $updates['shipping_line1'],
+            $updates['shipping_ward_name'],
+            $updates['shipping_district_name'],
+            $updates['shipping_province_name'],
+        ) ?: $order->shipping_address;
+
+        $order->update($updates);
+        $order->refresh();
+    }
+
+    private function defaultAddress(Order $order): ?UserAddress
+    {
+        $user = $order->user;
+
+        if (! $user) {
+            return null;
+        }
+
+        $user->loadMissing('addresses');
+
+        return $user->addresses->firstWhere('is_default', true)
+            ?? $user->addresses->sortByDesc('id')->first();
+    }
+
+    private function firstFilled(mixed ...$values): ?string
+    {
+        foreach ($values as $value) {
+            if ($value === null) {
+                continue;
+            }
+
+            $normalized = trim((string) $value);
+
+            if ($normalized !== '') {
+                return $normalized;
             }
         }
 
-        if ($updates !== []) {
-            $updates['shipping_address'] = $this->formatAddress(
-                $updates['shipping_line1'] ?? $order->shipping_line1 ?? $order->shipping_address,
-                $updates['shipping_ward_name'] ?? $order->shipping_ward_name,
-                $updates['shipping_district_name'] ?? $order->shipping_district_name,
-                $updates['shipping_province_name'] ?? $order->shipping_province_name,
-            );
-            $order->update($updates);
-            $order->refresh();
+        return null;
+    }
+
+    private function firstInteger(mixed ...$values): ?int
+    {
+        foreach ($values as $value) {
+            if ($value === null || $value === '') {
+                continue;
+            }
+
+            $parsed = (int) $value;
+
+            if ($parsed > 0) {
+                return $parsed;
+            }
         }
+
+        return null;
     }
 
     private function ghnCreatePayload(Order $order, ShippingCarrier $carrier, array $attributes): array

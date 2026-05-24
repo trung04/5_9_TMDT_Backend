@@ -156,6 +156,142 @@ class ShippingCarrierGhnApiTest extends TestCase
         ]);
     }
 
+    public function test_create_ghn_shipment_falls_back_to_customer_default_address(): void
+    {
+        $admin = $this->seededSuperAdmin();
+        $token = $admin->createToken('test')->plainTextToken;
+        $this->seed(ShippingCarrierSeeder::class);
+        $order = $this->createOrder(status: Order::STATUS_CONFIRMED);
+        $carrier = ShippingCarrier::query()->where('code', 'GHN')->firstOrFail();
+
+        $order->update([
+            'shipping_address' => 'Legacy checkout address',
+            'shipping_line1' => null,
+            'shipping_province_id' => null,
+            'shipping_province_name' => null,
+            'shipping_district_id' => null,
+            'shipping_district_name' => null,
+            'shipping_ward_code' => null,
+            'shipping_ward_name' => null,
+        ]);
+
+        $order->user->addresses()->create([
+            'label' => 'Default',
+            'recipient' => 'Fallback Receiver',
+            'phone' => '0900000099',
+            'line1' => '456 Cau Giay',
+            'city' => 'Ha Noi',
+            'ghn_province_id' => 201,
+            'ghn_province_name' => 'Ha Noi',
+            'ghn_district_id' => 1454,
+            'ghn_district_name' => 'Cau Giay',
+            'ghn_ward_code' => 'HN-CG-01',
+            'ghn_ward_name' => 'Dich Vong Hau',
+            'is_default' => true,
+        ]);
+
+        Http::fake([
+            'https://online-gateway.ghn.vn/shiip/public-api/v2/shipping-order/create' => Http::response([
+                'code' => 200,
+                'message' => 'Success',
+                'data' => [
+                    'order_code' => 'GHN-FALLBACK',
+                    'total_fee' => 25000,
+                ],
+            ]),
+        ]);
+
+        $response = $this->withToken($token)->postJson("/api/admin/orders/{$order->id}/shipment", [
+            'shipping_carrier_id' => $carrier->id,
+            'weight' => 1000,
+            'length' => 20,
+            'width' => 20,
+            'height' => 10,
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('data.shipping_line1', '456 Cau Giay')
+            ->assertJsonPath('data.shipping_province_id', 201)
+            ->assertJsonPath('data.shipping_district_id', 1454)
+            ->assertJsonPath('data.shipping_ward_code', 'HN-CG-01')
+            ->assertJsonPath('data.shipment.tracking_code', 'GHN-FALLBACK');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'shipping_address' => '456 Cau Giay, Dich Vong Hau, Cau Giay, Ha Noi',
+            'shipping_line1' => '456 Cau Giay',
+            'shipping_province_name' => 'Ha Noi',
+            'shipping_district_name' => 'Cau Giay',
+            'shipping_ward_name' => 'Dich Vong Hau',
+        ]);
+
+        Http::assertSent(fn ($request): bool => $request['to_address'] === '456 Cau Giay'
+            && $request['to_province_name'] === 'Ha Noi'
+            && $request['to_district_name'] === 'Cau Giay'
+            && $request['to_ward_name'] === 'Dich Vong Hau');
+    }
+
+    public function test_create_shipment_persists_admin_recipient_and_address_overrides(): void
+    {
+        $admin = $this->seededSuperAdmin();
+        $token = $admin->createToken('test')->plainTextToken;
+        $this->seed(ShippingCarrierSeeder::class);
+        $order = $this->createOrder(status: Order::STATUS_CONFIRMED);
+        $carrier = ShippingCarrier::query()->where('code', 'GHN')->firstOrFail();
+
+        Http::fake([
+            'https://online-gateway.ghn.vn/shiip/public-api/v2/shipping-order/create' => Http::response([
+                'code' => 200,
+                'message' => 'Success',
+                'data' => [
+                    'order_code' => 'GHN-OVERRIDE',
+                    'total_fee' => 28000,
+                ],
+            ]),
+        ]);
+
+        $response = $this->withToken($token)->postJson("/api/admin/orders/{$order->id}/shipment", [
+            'shipping_carrier_id' => $carrier->id,
+            'recipient_name' => 'Override Receiver',
+            'recipient_phone' => '0911111222',
+            'shipping_line1' => '88 Le Loi',
+            'shipping_province_id' => 203,
+            'shipping_province_name' => 'Da Nang',
+            'shipping_district_id' => 3001,
+            'shipping_district_name' => 'Hai Chau',
+            'shipping_ward_code' => 'DN-HC-01',
+            'shipping_ward_name' => 'Hai Chau 1',
+            'weight' => 1200,
+            'length' => 25,
+            'width' => 18,
+            'height' => 12,
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('data.recipient_name', 'Override Receiver')
+            ->assertJsonPath('data.recipient_phone', '0911111222')
+            ->assertJsonPath('data.shipping_address', '88 Le Loi, Hai Chau 1, Hai Chau, Da Nang')
+            ->assertJsonPath('data.shipment.tracking_code', 'GHN-OVERRIDE');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'recipient_name' => 'Override Receiver',
+            'recipient_phone' => '0911111222',
+            'shipping_line1' => '88 Le Loi',
+            'shipping_province_id' => 203,
+            'shipping_province_name' => 'Da Nang',
+            'shipping_district_id' => 3001,
+            'shipping_district_name' => 'Hai Chau',
+            'shipping_ward_code' => 'DN-HC-01',
+            'shipping_ward_name' => 'Hai Chau 1',
+        ]);
+
+        Http::assertSent(fn ($request): bool => $request['to_name'] === 'Override Receiver'
+            && $request['to_phone'] === '0911111222'
+            && $request['to_address'] === '88 Le Loi'
+            && $request['to_province_name'] === 'Da Nang');
+    }
+
     public function test_order_cannot_be_shipped_without_a_shipment(): void
     {
         $admin = $this->seededSuperAdmin();

@@ -253,7 +253,7 @@ class OrderService
     public function listAdminOrders(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
         $query = Order::query()
-            ->with(['user', 'items', 'payment', 'shipment.carrier'])
+            ->with(['user.addresses', 'items', 'payment', 'shipment.carrier'])
             ->orderByDesc('id');
 
         if (! empty($filters['user_id'])) {
@@ -592,7 +592,7 @@ class OrderService
      */
     public function orderSummaryPayload(Order $order): array
     {
-        $order->loadMissing(['user', 'items', 'payment', 'shipment.carrier']);
+        $order->loadMissing(['user.addresses', 'items', 'payment', 'shipment.carrier']);
 
         return [
             'id' => $order->id,
@@ -685,14 +685,46 @@ class OrderService
      */
     private function customerPayload(User $user): array
     {
+        $user->loadMissing('addresses');
+
         return [
             'id' => $user->id,
             'full_name' => $user->full_name,
             'email' => $user->email,
             'phone' => $user->phone,
+            'address' => $user->address,
+            'city' => $user->city,
+            'default_address' => $this->defaultAddressPayload($user),
             'role' => $user->role,
             'is_active' => (bool) $user->is_active,
             'is_deleted' => (bool) $user->is_deleted,
+        ];
+    }
+
+    private function defaultAddressPayload(User $user): ?array
+    {
+        $address = $user->addresses->firstWhere('is_default', true)
+            ?? $user->addresses->sortByDesc('id')->first();
+
+        if (! $address) {
+            return null;
+        }
+
+        return [
+            'id' => $address->id,
+            'label' => $address->label,
+            'recipient' => $address->recipient,
+            'phone' => $address->phone,
+            'line1' => $address->line1,
+            'city' => $address->city,
+            'ghn_province_id' => $address->ghn_province_id,
+            'ghn_province_name' => $address->ghn_province_name,
+            'ghn_district_id' => $address->ghn_district_id,
+            'ghn_district_name' => $address->ghn_district_name,
+            'ghn_ward_code' => $address->ghn_ward_code,
+            'ghn_ward_name' => $address->ghn_ward_name,
+            'note' => $address->note,
+            'is_default' => (bool) $address->is_default,
         ];
     }
 
@@ -1312,7 +1344,7 @@ class OrderService
     private function orderRelations(): array
     {
         return [
-            'user',
+            'user.addresses',
             'items' => fn ($query) => $query->orderBy('id'),
             'payment',
             'shipment.carrier',
