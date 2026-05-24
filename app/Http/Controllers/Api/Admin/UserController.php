@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Concerns\EnsuresAdminAccess;
 use App\Http\Controllers\Api\Concerns\PaginatesApiResults;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\OrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -16,6 +17,10 @@ class UserController extends Controller
 {
     use EnsuresAdminAccess;
     use PaginatesApiResults;
+
+    public function __construct(private readonly OrderService $orderService)
+    {
+    }
 
     public function index(Request $request): JsonResponse
     {
@@ -48,6 +53,34 @@ class UserController extends Controller
             'message' => 'Admin user retrieved successfully.',
             'data' => $this->customerPayload($user->loadCount('orders')),
         ]);
+    }
+
+    public function orders(Request $request, User $user): JsonResponse
+    {
+        if ($response = $this->ensureAdmin($request, 'admin.users.view')) {
+            return $response;
+        }
+
+        if ($response = $this->ensureAdmin($request, 'admin.orders.view')) {
+            return $response;
+        }
+
+        if ($response = $this->ensureCustomerAccount($user)) {
+            return $response;
+        }
+
+        $orders = $this->orderService->listAdminOrders([
+            'user_id' => $user->id,
+            'status' => $request->query('status'),
+            'keyword' => $request->query('keyword'),
+        ], $this->perPage($request, 5));
+
+        return response()->json(
+            $this->transformPaginator(
+                $orders,
+                fn ($order): array => $this->orderService->orderSummaryPayload($order)
+            )
+        );
     }
 
     public function store(Request $request): JsonResponse

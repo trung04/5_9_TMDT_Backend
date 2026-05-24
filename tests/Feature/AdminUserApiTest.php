@@ -98,6 +98,90 @@ class AdminUserApiTest extends TestCase
             ->assertJsonPath('message', 'You do not have permission to access this resource.');
     }
 
+    public function test_admin_can_view_customer_order_history_from_user_endpoint(): void
+    {
+        $superAdmin = $this->seededSuperAdmin();
+        $token = $superAdmin->createToken('super-admin')->plainTextToken;
+        $customer = User::factory()->create([
+            'full_name' => 'Customer History',
+        ]);
+        $otherCustomer = User::factory()->create([
+            'full_name' => 'Other Customer',
+        ]);
+
+        $firstOrder = Order::query()->create([
+            'user_id' => $customer->id,
+            'order_no' => 'ORD-CUSTOMER-001',
+            'recipient_name' => $customer->full_name,
+            'recipient_phone' => $customer->phone,
+            'shipping_address' => '12 Nguyen Trai',
+            'payment_method' => Order::PAYMENT_METHOD_COD,
+            'status' => Order::STATUS_PENDING,
+            'subtotal' => 100000,
+            'shipping_fee' => 20000,
+            'discount_amount' => 0,
+            'total_amount' => 120000,
+            'stock_deducted' => false,
+        ]);
+
+        $secondOrder = Order::query()->create([
+            'user_id' => $customer->id,
+            'order_no' => 'ORD-CUSTOMER-002',
+            'recipient_name' => $customer->full_name,
+            'recipient_phone' => $customer->phone,
+            'shipping_address' => '34 Tran Phu',
+            'payment_method' => Order::PAYMENT_METHOD_BANK_TRANSFER,
+            'status' => Order::STATUS_CONFIRMED,
+            'subtotal' => 250000,
+            'shipping_fee' => 0,
+            'discount_amount' => 10000,
+            'total_amount' => 240000,
+            'stock_deducted' => false,
+        ]);
+
+        Order::query()->create([
+            'user_id' => $otherCustomer->id,
+            'order_no' => 'ORD-OTHER-001',
+            'recipient_name' => $otherCustomer->full_name,
+            'recipient_phone' => $otherCustomer->phone,
+            'shipping_address' => '99 Le Loi',
+            'payment_method' => Order::PAYMENT_METHOD_COD,
+            'status' => Order::STATUS_PENDING,
+            'subtotal' => 90000,
+            'shipping_fee' => 15000,
+            'discount_amount' => 0,
+            'total_amount' => 105000,
+            'stock_deducted' => false,
+        ]);
+
+        $this->withToken($token)->getJson("/api/admin/users/{$customer->id}/orders?per_page=1")
+            ->assertOk()
+            ->assertJsonPath('current_page', 1)
+            ->assertJsonPath('per_page', 1)
+            ->assertJsonPath('total', 2)
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.customer.id', $customer->id)
+            ->assertJsonPath('data.0.order_no', $secondOrder->order_no);
+
+        $this->withToken($token)->getJson('/api/admin/orders?per_page=100')
+            ->assertOk()
+            ->assertJsonPath('total', 3)
+            ->assertJsonFragment(['order_no' => $firstOrder->order_no])
+            ->assertJsonFragment(['order_no' => $secondOrder->order_no]);
+    }
+
+    public function test_customer_order_history_requires_order_view_permission(): void
+    {
+        $this->seed(AdminAccessSeeder::class);
+        $admin = $this->childAdminWithPermissions(['admin.users.view']);
+        $token = $admin->createToken('user-viewer')->plainTextToken;
+        $customer = User::factory()->create();
+
+        $this->withToken($token)->getJson("/api/admin/users/{$customer->id}/orders")
+            ->assertStatus(403)
+            ->assertJsonPath('message', 'You do not have permission to access this resource.');
+    }
+
     public function test_soft_delete_preserves_customer_orders(): void
     {
         $superAdmin = $this->seededSuperAdmin();
@@ -139,6 +223,16 @@ class AdminUserApiTest extends TestCase
         $token = $superAdmin->createToken('super-admin')->plainTextToken;
 
         $this->withToken($token)->deleteJson("/api/admin/users/{$superAdmin->id}")
+            ->assertNotFound()
+            ->assertJsonPath('message', 'Only customer accounts can be managed from this endpoint.');
+    }
+
+    public function test_customer_order_history_endpoint_rejects_non_customer_accounts(): void
+    {
+        $superAdmin = $this->seededSuperAdmin();
+        $token = $superAdmin->createToken('super-admin')->plainTextToken;
+
+        $this->withToken($token)->getJson("/api/admin/users/{$superAdmin->id}/orders")
             ->assertNotFound()
             ->assertJsonPath('message', 'Only customer accounts can be managed from this endpoint.');
     }

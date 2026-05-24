@@ -256,6 +256,10 @@ class OrderService
             ->with(['user', 'items', 'payment', 'shipment.carrier'])
             ->orderByDesc('id');
 
+        if (! empty($filters['user_id'])) {
+            $query->where('user_id', (int) $filters['user_id']);
+        }
+
         if (! empty($filters['status'])) {
             $query->where('status', (string) $filters['status']);
         }

@@ -122,6 +122,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::delete('/shipping-carriers/{carrier}', [AdminShippingCarrierController::class, 'destroy']);
         Route::get('/users', [AdminUserController::class, 'index']);
         Route::get('/users/{user}', [AdminUserController::class, 'show']);
+        Route::get('/users/{user}/orders', [AdminUserController::class, 'orders']);
         Route::post('/users', [AdminUserController::class, 'store']);
         Route::put('/users/{user}', [AdminUserController::class, 'update']);
         Route::delete('/users/{user}', [AdminUserController::class, 'destroy']);
