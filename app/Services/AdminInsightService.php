@@ -149,11 +149,11 @@ class AdminInsightService
                     : null,
             ])
             ->all();
-
+        
         $recentOrders = Order::query()
             ->with(['payment', 'user'])
             ->latest('id')
-            ->limit(8)
+            ->limit(10)
             ->get()
             ->map(fn (Order $order): array => $this->orderSnapshot($order))
             ->all();
@@ -260,7 +260,12 @@ class AdminInsightService
             'filters' => [
                 'date_from' => $rangeStart->toDateString(),
                 'date_to' => $rangeEnd->toDateString(),
+                'date_from_input' => $this->formatDateTimeLocal($rangeStart),
+                'date_to_input' => $this->formatDateTimeLocal($rangeEnd),
                 'chart_range' => $chartRange,
+                'date_range_label' => $this->formatDateRangeLabel($rangeStart, $rangeEnd),
+                'chart_range_label' => $this->chartRangeLabel($chartRange),
+                'chart_period_label' => $this->formatDateRangeLabel($chartStart, $chartEnd),
             ],
             'recent_orders' => $recentOrders,
             'work_queue' => $workQueue,
@@ -371,7 +376,7 @@ class AdminInsightService
 
     private function applyDeliveredBetween(Builder $query, Carbon $start, Carbon $end): Builder
     {
-        return $query->whereBetween('delivered_at', [$start->copy()->startOfDay(), $end->copy()->endOfDay()]);
+        return $query->whereBetween('delivered_at', [$start->copy(), $end->copy()]);
     }
 
     /**
@@ -430,18 +435,16 @@ class AdminInsightService
      */
     private function resolveDateRange(array $filters): array
     {
-        $start = isset($filters['date_from']) && is_string($filters['date_from']) && $filters['date_from'] !== ''
-            ? Carbon::parse($filters['date_from'])
-            : now()->copy()->startOfMonth();
-        $end = isset($filters['date_to']) && is_string($filters['date_to']) && $filters['date_to'] !== ''
-            ? Carbon::parse($filters['date_to'])
-            : now()->copy()->endOfMonth();
+        $start = $this->parseDateBoundary($filters['date_from'] ?? null, true)
+            ?? now()->copy()->startOfMonth();
+        $end = $this->parseDateBoundary($filters['date_to'] ?? null, false)
+            ?? now()->copy()->endOfMonth();
 
         if ($start->gt($end)) {
             [$start, $end] = [$end, $start];
         }
 
-        return [$start->startOfDay(), $end->endOfDay()];
+        return [$start, $end];
     }
 
     /**
@@ -457,8 +460,53 @@ class AdminInsightService
         return match ($chartRange) {
             '7d' => [now()->copy()->subDays(6)->startOfDay(), now()->copy()->endOfDay(), '7d'],
             'this_month' => [now()->copy()->startOfMonth(), now()->copy()->endOfDay(), 'this_month'],
-            'custom' => [$rangeStart->copy()->startOfDay(), $rangeEnd->copy()->endOfDay(), 'custom'],
+            'custom' => [$rangeStart->copy(), $rangeEnd->copy(), 'custom'],
             default => [now()->copy()->subDays(29)->startOfDay(), now()->copy()->endOfDay(), '30d'],
+        };
+    }
+
+    private function parseDateBoundary(mixed $value, bool $isStart): ?Carbon
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $normalized = trim($value);
+        $date = Carbon::parse($normalized);
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $normalized) === 1) {
+            return $isStart ? $date->startOfDay() : $date->endOfDay();
+        }
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}$/', $normalized) === 1) {
+            return $isStart ? $date->startOfMinute() : $date->endOfMinute();
+        }
+
+        return $date;
+    }
+
+    private function formatDateTimeLocal(Carbon $value): string
+    {
+        return $value->format('Y-m-d\TH:i');
+    }
+
+    private function formatDateRangeLabel(Carbon $start, Carbon $end): string
+    {
+        return $this->formatDateTimeDisplay($start).' - '.$this->formatDateTimeDisplay($end);
+    }
+
+    private function formatDateTimeDisplay(Carbon $value): string
+    {
+        return $value->format('d/m/Y H:i');
+    }
+
+    private function chartRangeLabel(string $chartRange): string
+    {
+        return match ($chartRange) {
+            '7d' => '7 ngày gần nhất',
+            'this_month' => 'Tháng này',
+            'custom' => 'Tùy chỉnh',
+            default => '30 ngày gần nhất',
         };
     }
 }

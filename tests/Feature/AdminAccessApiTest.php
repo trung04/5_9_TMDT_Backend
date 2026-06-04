@@ -2,8 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\AdminPermission;
-use App\Models\AdminRole;
 use App\Models\User;
 use Database\Seeders\AdminAccessSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,7 +12,7 @@ class AdminAccessApiTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_admin_access_seeder_creates_super_admin_from_config(): void
+    public function test_admin_access_seeder_creates_bootstrap_admin_from_config(): void
     {
         config()->set('admin_access.super_admin', [
             'name' => 'Root Admin',
@@ -25,17 +23,16 @@ class AdminAccessApiTest extends TestCase
 
         $this->seed(AdminAccessSeeder::class);
 
-        $role = AdminRole::query()->where('slug', AdminRole::SUPER_ADMIN_SLUG)->firstOrFail();
         $admin = User::query()->where('email', 'root@example.com')->firstOrFail();
 
-        $this->assertTrue($role->is_super);
-        $this->assertTrue($role->is_system);
-        $this->assertSame($role->id, $admin->admin_role_id);
+        $this->assertSame(User::ROLE_ADMIN, $admin->role);
+        $this->assertNull($admin->admin_role_id);
+        $this->assertTrue((bool) $admin->is_active);
+        $this->assertFalse((bool) $admin->is_deleted);
         $this->assertTrue(Hash::check('secret123', $admin->password_hash));
-        $this->assertSame(AdminPermission::query()->count(), $role->permissions()->count());
     }
 
-    public function test_login_and_me_return_admin_role_and_permissions(): void
+    public function test_login_and_me_omit_admin_role_and_permissions(): void
     {
         $this->seed(AdminAccessSeeder::class);
 
@@ -46,104 +43,126 @@ class AdminAccessApiTest extends TestCase
 
         $loginResponse->assertOk()
             ->assertJsonPath('user.role', User::ROLE_ADMIN)
-            ->assertJsonPath('user.admin_role.slug', AdminRole::SUPER_ADMIN_SLUG)
-            ->assertJsonPath('user.admin_role.is_super', true);
-
-        $this->assertContains('admin.dashboard.view', $loginResponse->json('user.permissions'));
+            ->assertJsonMissingPath('user.admin_role')
+            ->assertJsonMissingPath('user.permissions');
 
         $token = $loginResponse->json('access_token');
+
         $this->withToken($token)->getJson('/api/me')
             ->assertOk()
-            ->assertJsonPath('user.admin_role.slug', AdminRole::SUPER_ADMIN_SLUG);
+            ->assertJsonPath('user.role', User::ROLE_ADMIN)
+            ->assertJsonMissingPath('user.admin_role')
+            ->assertJsonMissingPath('user.permissions');
     }
 
-    public function test_super_admin_can_create_roles_and_admin_child_accounts(): void
+    public function test_active_admin_can_crud_admin_accounts_without_admin_role_id(): void
     {
-        $superAdmin = $this->seededSuperAdmin();
-        $token = $superAdmin->createToken('test')->plainTextToken;
+        $admin = $this->seededAdmin();
+        $token = $admin->createToken('test')->plainTextToken;
 
-        $roleResponse = $this->withToken($token)->postJson('/api/admin/access/roles', [
-            'name' => 'Catalog Operator',
-            'description' => 'Can read catalog data.',
-            'permissions' => ['admin.products.view'],
-        ]);
-
-        $roleResponse->assertCreated()
-            ->assertJsonPath('data.name', 'Catalog Operator')
-            ->assertJsonPath('data.permission_keys.0', 'admin.products.view');
-
-        $adminResponse = $this->withToken($token)->postJson('/api/admin/access/admins', [
+        $createResponse = $this->withToken($token)->postJson('/api/admin/admins', [
             'full_name' => 'Child Admin',
             'email' => 'child-admin@example.com',
             'phone' => '0987654321',
             'password' => 'password123',
-            'admin_role_id' => $roleResponse->json('data.id'),
+            'is_active' => true,
         ]);
 
-        $adminResponse->assertCreated()
+        $createResponse->assertCreated()
+            ->assertJsonPath('data.full_name', 'Child Admin')
             ->assertJsonPath('data.email', 'child-admin@example.com')
-            ->assertJsonPath('data.admin_role.name', 'Catalog Operator');
-    }
+            ->assertJsonPath('data.role', User::ROLE_ADMIN)
+            ->assertJsonMissingPath('data.admin_role');
 
-    public function test_admin_child_is_limited_by_role_permissions(): void
-    {
-        $this->seed(AdminAccessSeeder::class);
-        $permission = AdminPermission::query()->where('key', 'admin.products.view')->firstOrFail();
-        $role = AdminRole::query()->create([
-            'name' => 'Product Viewer',
-            'slug' => 'product_viewer',
-            'description' => null,
-        ]);
-        $role->permissions()->sync([$permission->id]);
-        $admin = User::factory()->create([
+        $childAdminId = $createResponse->json('data.id');
+
+        $this->assertDatabaseHas('users', [
+            'id' => $childAdminId,
             'role' => User::ROLE_ADMIN,
-            'admin_role_id' => $role->id,
+            'admin_role_id' => null,
+            'created_by_admin_id' => $admin->id,
         ]);
-        $token = $admin->createToken('child')->plainTextToken;
 
-        $this->withToken($token)->getJson('/api/admin/products')
-            ->assertOk();
+        $this->withToken($token)->getJson('/api/admin/admins?per_page=20')
+            ->assertOk()
+            ->assertJsonPath('per_page', 20)
+            ->assertJsonPath('total', 2)
+            ->assertJsonFragment(['email' => 'child-admin@example.com']);
 
-        $this->withToken($token)->deleteJson('/api/admin/products/1')
-            ->assertStatus(403)
-            ->assertJsonPath('message', 'You do not have permission to access this resource.');
+        $this->withToken($token)->putJson("/api/admin/admins/{$childAdminId}", [
+            'full_name' => 'Child Admin Updated',
+            'email' => 'child-admin@example.com',
+            'phone' => '0987654321',
+            'is_active' => true,
+        ])->assertOk()
+            ->assertJsonPath('data.full_name', 'Child Admin Updated');
+
+        $this->withToken($token)->patchJson("/api/admin/admins/{$childAdminId}/password", [
+            'password' => 'newpassword123',
+        ])->assertOk()
+            ->assertJsonPath('message', 'Admin account password updated successfully.');
+
+        $this->withToken($token)->patchJson("/api/admin/admins/{$childAdminId}/status", [
+            'is_active' => false,
+            'is_deleted' => true,
+        ])->assertOk()
+            ->assertJsonPath('data.is_active', false)
+            ->assertJsonPath('data.is_deleted', true);
     }
 
-    public function test_non_admin_is_blocked_from_admin_supplier_routes(): void
+    public function test_non_admin_is_blocked_from_admin_management_routes(): void
     {
         $customer = User::factory()->create();
         $token = $customer->createToken('customer')->plainTextToken;
 
-        $this->withToken($token)->postJson('/api/admin/suppliers', [
-            'supplier_code' => 'SUP-TEST',
-            'name' => 'Supplier Test',
-            'phone' => '0909090909',
-        ])->assertStatus(403)
+        $this->withToken($token)->getJson('/api/admin/admins')
+            ->assertStatus(403)
             ->assertJsonPath('message', 'You do not have permission to access this resource.');
     }
 
-    public function test_super_admin_role_and_last_super_admin_are_protected(): void
+    public function test_inactive_admin_is_blocked_from_admin_management_routes(): void
     {
-        $superAdmin = $this->seededSuperAdmin();
-        $token = $superAdmin->createToken('test')->plainTextToken;
-        $superRole = AdminRole::query()->where('slug', AdminRole::SUPER_ADMIN_SLUG)->firstOrFail();
-
-        $this->withToken($token)->deleteJson("/api/admin/access/roles/{$superRole->id}")
-            ->assertStatus(422);
-
-        $this->withToken($token)->patchJson("/api/admin/access/admins/{$superAdmin->id}/status", [
+        $admin = User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+            'admin_role_id' => null,
             'is_active' => false,
+            'is_deleted' => false,
+        ]);
+        $token = $admin->createToken('inactive-admin')->plainTextToken;
+
+        $this->withToken($token)->getJson('/api/admin/admins')
+            ->assertStatus(403)
+            ->assertJsonPath('message', 'Your account is not allowed to use this resource.');
+    }
+
+    public function test_last_active_admin_cannot_be_disabled(): void
+    {
+        $admin = $this->seededAdmin();
+        $token = $admin->createToken('test')->plainTextToken;
+
+        $this->withToken($token)->patchJson("/api/admin/admins/{$admin->id}/status", [
+            'is_active' => false,
+            'is_deleted' => true,
         ])->assertStatus(422)
             ->assertJsonValidationErrors(['admin']);
     }
 
-    private function seededSuperAdmin(): User
+    public function test_removed_access_endpoints_return_not_found(): void
+    {
+        $admin = $this->seededAdmin();
+        $token = $admin->createToken('test')->plainTextToken;
+
+        $this->withToken($token)->getJson('/api/admin/access/permissions')->assertNotFound();
+        $this->withToken($token)->getJson('/api/admin/access/roles')->assertNotFound();
+        $this->withToken($token)->getJson('/api/admin/access/admins')->assertNotFound();
+    }
+
+    private function seededAdmin(): User
     {
         $this->seed(AdminAccessSeeder::class);
 
         return User::query()
             ->where('email', config('admin_access.super_admin.email'))
-            ->firstOrFail()
-            ->load(['adminRole.permissions']);
+            ->firstOrFail();
     }
 }

@@ -20,8 +20,17 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
-            return route('login');
+            if ($request->is('admin-web') || $request->is('admin-web/*')) {
+                return route('admin-web.login');
+            }
+
+            return '/';
         });
+
+        $middleware->alias([
+            'admin.web' => \App\Http\Middleware\EnsureAdminWebAccess::class,
+            'admin.web.guest' => \App\Http\Middleware\RedirectIfAdminWebAuthenticated::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(function (Request $request, \Throwable $exception): bool {

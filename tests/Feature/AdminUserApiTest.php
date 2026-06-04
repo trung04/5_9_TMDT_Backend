@@ -2,8 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\AdminPermission;
-use App\Models\AdminRole;
 use App\Models\Order;
 use App\Models\User;
 use Database\Seeders\AdminAccessSeeder;
@@ -14,10 +12,10 @@ class AdminUserApiTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_super_admin_can_crud_customer_accounts(): void
+    public function test_active_admin_without_admin_role_can_crud_customer_accounts(): void
     {
-        $superAdmin = $this->seededSuperAdmin();
-        $token = $superAdmin->createToken('super-admin')->plainTextToken;
+        $admin = $this->plainAdmin();
+        $token = $admin->createToken('admin')->plainTextToken;
 
         $createResponse = $this->withToken($token)->postJson('/api/admin/users', [
             'full_name' => 'Customer Managed',
@@ -27,46 +25,39 @@ class AdminUserApiTest extends TestCase
             'address' => '12 Nguyen Trai',
             'city' => 'Ha Noi',
             'favorite_region' => 'Dong Bac',
-            'newsletter' => true,
-            'sms_alerts' => false,
-            'order_email' => true,
-            'security_alerts' => true,
-            'reward_points' => 120,
-            'reward_tier' => 'Silver',
-            'next_tier_points' => 1000,
         ]);
 
         $createResponse->assertCreated()
             ->assertJsonPath('data.email', 'managed-customer@example.com')
             ->assertJsonPath('data.role', User::ROLE_CUSTOMER)
             ->assertJsonPath('data.orders_count', 0);
+        $this->assertCustomerPayloadOmitsRemovedFields($createResponse);
 
         $customerId = $createResponse->json('data.id');
 
-        $this->withToken($token)->getJson('/api/admin/users')
+        $listResponse = $this->withToken($token)->getJson('/api/admin/users');
+
+        $listResponse
             ->assertOk()
             ->assertJsonPath('per_page', 15)
             ->assertJsonPath('total', 1)
             ->assertJsonFragment(['email' => 'managed-customer@example.com']);
+        $this->assertCustomerPayloadOmitsRemovedFields($listResponse, 'data.0');
 
-        $this->withToken($token)->putJson("/api/admin/users/{$customerId}", [
+        $updateResponse = $this->withToken($token)->putJson("/api/admin/users/{$customerId}", [
             'full_name' => 'Customer Updated',
             'email' => 'managed-customer@example.com',
             'phone' => '0901111222',
             'address' => '88 Tran Hung Dao',
             'city' => 'Da Nang',
             'favorite_region' => 'Duyen hai mien Trung',
-            'newsletter' => false,
-            'sms_alerts' => true,
-            'order_email' => true,
-            'security_alerts' => true,
-            'reward_points' => 250,
-            'reward_tier' => 'Gold',
-            'next_tier_points' => 1500,
             'is_active' => true,
-        ])->assertOk()
+        ]);
+
+        $updateResponse->assertOk()
             ->assertJsonPath('data.full_name', 'Customer Updated')
-            ->assertJsonPath('data.reward_tier', 'Gold');
+            ->assertJsonPath('data.is_active', true);
+        $this->assertCustomerPayloadOmitsRemovedFields($updateResponse);
 
         $this->withToken($token)->deleteJson("/api/admin/users/{$customerId}")
             ->assertOk()
@@ -80,28 +71,20 @@ class AdminUserApiTest extends TestCase
         ]);
     }
 
-    public function test_child_admin_is_limited_by_user_permissions(): void
+    public function test_non_admin_cannot_manage_customer_accounts(): void
     {
-        $this->seed(AdminAccessSeeder::class);
-        $admin = $this->childAdminWithPermissions(['admin.users.view']);
-        $token = $admin->createToken('user-viewer')->plainTextToken;
+        $customer = User::factory()->create();
+        $token = $customer->createToken('customer')->plainTextToken;
 
         $this->withToken($token)->getJson('/api/admin/users')
-            ->assertOk();
-
-        $this->withToken($token)->postJson('/api/admin/users', [
-            'full_name' => 'Denied Customer',
-            'email' => 'denied-customer@example.com',
-            'phone' => '0902222333',
-            'password' => 'password123',
-        ])->assertStatus(403)
+            ->assertStatus(403)
             ->assertJsonPath('message', 'You do not have permission to access this resource.');
     }
 
     public function test_admin_can_view_customer_order_history_from_user_endpoint(): void
     {
-        $superAdmin = $this->seededSuperAdmin();
-        $token = $superAdmin->createToken('super-admin')->plainTextToken;
+        $admin = $this->plainAdmin();
+        $token = $admin->createToken('admin')->plainTextToken;
         $customer = User::factory()->create([
             'full_name' => 'Customer History',
         ]);
@@ -170,12 +153,10 @@ class AdminUserApiTest extends TestCase
             ->assertJsonFragment(['order_no' => $secondOrder->order_no]);
     }
 
-    public function test_customer_order_history_requires_order_view_permission(): void
+    public function test_customer_order_history_requires_admin_role(): void
     {
-        $this->seed(AdminAccessSeeder::class);
-        $admin = $this->childAdminWithPermissions(['admin.users.view']);
-        $token = $admin->createToken('user-viewer')->plainTextToken;
         $customer = User::factory()->create();
+        $token = $customer->createToken('customer')->plainTextToken;
 
         $this->withToken($token)->getJson("/api/admin/users/{$customer->id}/orders")
             ->assertStatus(403)
@@ -184,8 +165,8 @@ class AdminUserApiTest extends TestCase
 
     public function test_soft_delete_preserves_customer_orders(): void
     {
-        $superAdmin = $this->seededSuperAdmin();
-        $token = $superAdmin->createToken('super-admin')->plainTextToken;
+        $admin = $this->plainAdmin();
+        $token = $admin->createToken('admin')->plainTextToken;
         $customer = User::factory()->create();
         $order = Order::query()->create([
             'user_id' => $customer->id,
@@ -219,54 +200,48 @@ class AdminUserApiTest extends TestCase
 
     public function test_admin_user_endpoint_rejects_non_customer_accounts(): void
     {
-        $superAdmin = $this->seededSuperAdmin();
-        $token = $superAdmin->createToken('super-admin')->plainTextToken;
+        $admin = $this->plainAdmin();
+        $token = $admin->createToken('admin')->plainTextToken;
 
-        $this->withToken($token)->deleteJson("/api/admin/users/{$superAdmin->id}")
+        $this->withToken($token)->deleteJson("/api/admin/users/{$admin->id}")
             ->assertNotFound()
             ->assertJsonPath('message', 'Only customer accounts can be managed from this endpoint.');
     }
 
     public function test_customer_order_history_endpoint_rejects_non_customer_accounts(): void
     {
-        $superAdmin = $this->seededSuperAdmin();
-        $token = $superAdmin->createToken('super-admin')->plainTextToken;
+        $admin = $this->plainAdmin();
+        $token = $admin->createToken('admin')->plainTextToken;
 
-        $this->withToken($token)->getJson("/api/admin/users/{$superAdmin->id}/orders")
+        $this->withToken($token)->getJson("/api/admin/users/{$admin->id}/orders")
             ->assertNotFound()
             ->assertJsonPath('message', 'Only customer accounts can be managed from this endpoint.');
     }
 
-    private function seededSuperAdmin(): User
+    private function plainAdmin(): User
     {
         $this->seed(AdminAccessSeeder::class);
 
-        return User::query()
-            ->where('email', config('admin_access.super_admin.email'))
-            ->firstOrFail()
-            ->load(['adminRole.permissions']);
-    }
-
-    /**
-     * @param list<string> $permissionKeys
-     */
-    private function childAdminWithPermissions(array $permissionKeys): User
-    {
-        $permissions = AdminPermission::query()
-            ->whereIn('key', $permissionKeys)
-            ->pluck('id')
-            ->all();
-
-        $role = AdminRole::query()->create([
-            'name' => 'User Operator',
-            'slug' => 'user_operator',
-            'description' => null,
-        ]);
-        $role->permissions()->sync($permissions);
-
         return User::factory()->create([
             'role' => User::ROLE_ADMIN,
-            'admin_role_id' => $role->id,
-        ])->load(['adminRole.permissions']);
+            'admin_role_id' => null,
+            'is_active' => true,
+            'is_deleted' => false,
+        ]);
+    }
+
+    private function assertCustomerPayloadOmitsRemovedFields(\Illuminate\Testing\TestResponse $response, string $path = 'data'): void
+    {
+        foreach ([
+            'newsletter',
+            'sms_alerts',
+            'order_email',
+            'security_alerts',
+            'reward_points',
+            'reward_tier',
+            'next_tier_points',
+        ] as $field) {
+            $response->assertJsonMissingPath("{$path}.{$field}");
+        }
     }
 }

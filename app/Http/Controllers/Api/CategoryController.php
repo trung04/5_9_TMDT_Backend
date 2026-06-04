@@ -177,20 +177,6 @@ class CategoryController extends Controller
      */
     private function ensureAdminWithAnyPermission(Request $request, array $permissionKeys): ?JsonResponse
     {
-        if ($response = $this->ensureAdmin($request)) {
-            return $response;
-        }
-
-        $user = $request->user();
-
-        foreach ($permissionKeys as $permissionKey) {
-            if ($user->hasAdminPermission($permissionKey)) {
-                return null;
-            }
-        }
-
-        return response()->json([
-            'message' => 'You do not have permission to access this resource.',
-        ], 403);
+        return $this->ensureAdmin($request);
     }
 }

@@ -366,8 +366,7 @@ class ShippingCarrierGhnApiTest extends TestCase
 
         return User::query()
             ->where('email', config('admin_access.super_admin.email'))
-            ->firstOrFail()
-            ->load(['adminRole.permissions']);
+            ->firstOrFail();
     }
 
     private function createProduct(float $price = 100000, int $stock = 10): Product

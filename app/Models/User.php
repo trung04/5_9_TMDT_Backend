@@ -109,20 +109,12 @@ class User extends Authenticatable
 
     public function isSuperAdmin(): bool
     {
-        return $this->isAdmin() && (bool) $this->adminRole?->is_super;
+        return false;
     }
 
     public function hasAdminPermission(string $permissionKey): bool
     {
-        if ($this->isSuperAdmin()) {
-            return true;
-        }
-
-        if (! $this->isAdmin() || ! $this->adminRole) {
-            return false;
-        }
-
-        return $this->adminRole->permissions->contains('key', $permissionKey);
+        return $this->isAdmin() && $this->canAuthenticate();
     }
 
     /**
@@ -130,26 +122,7 @@ class User extends Authenticatable
      */
     public function adminPermissionKeys(): array
     {
-        if (! $this->isAdmin()) {
-            return [];
-        }
-
-        if ($this->isSuperAdmin()) {
-            return collect(config('admin_access.permissions', []))
-                ->pluck('key')
-                ->filter()
-                ->values()
-                ->all();
-        }
-
-        if (! $this->adminRole) {
-            return [];
-        }
-
-        return $this->adminRole->permissions
-            ->pluck('key')
-            ->values()
-            ->all();
+        return [];
     }
 
     /**

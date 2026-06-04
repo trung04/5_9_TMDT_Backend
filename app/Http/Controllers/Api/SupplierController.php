@@ -7,7 +7,6 @@ use App\Http\Controllers\Api\Concerns\PaginatesApiResults;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SupplierRequest;
 use App\Models\Supplier;
-use App\Services\SupplierService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -15,13 +14,6 @@ class SupplierController extends Controller
 {
     use EnsuresAdminAccess;
     use PaginatesApiResults;
-
-    private SupplierService $supplierService;
-
-    public function __construct(SupplierService $supplierService)
-    {
-        $this->supplierService = $supplierService;
-    }
 
     /**
      * Get list of all active suppliers (public endpoint).
@@ -31,7 +23,9 @@ class SupplierController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $suppliers = $this->supplierService->getAllSuppliers($this->perPage($request));
+        $suppliers = Supplier::query()
+            ->available()
+            ->paginate($this->perPage($request));
 
         return response()->json($suppliers);
     }
@@ -63,13 +57,16 @@ class SupplierController extends Controller
      */
     public function show(Supplier $supplier): JsonResponse
     {
-        if (! $supplier->is_active || $supplier->is_deleted) {
+        $supplierWithCount = Supplier::query()
+            ->available()
+            ->withCount('products')
+            ->find($supplier->id);
+
+        if (! $supplierWithCount) {
             return response()->json([
                 'message' => 'Supplier not found.',
             ], 404);
         }
-
-        $supplierWithCount = $this->supplierService->getSupplierById($supplier->id);
 
         return response()->json([
             'message' => 'Supplier retrieved successfully.',
@@ -91,7 +88,9 @@ class SupplierController extends Controller
             ], 404);
         }
 
-        $products = $this->supplierService->getProductsBySupplier($supplier->id, $this->perPage($request));
+        $products = $supplier->products()
+            ->available()
+            ->paginate($this->perPage($request));
 
         return response()->json($products);
     }
@@ -105,7 +104,7 @@ class SupplierController extends Controller
             return $response;
         }
 
-        $supplier = $this->supplierService->createSupplier($request->validated());
+        $supplier = Supplier::query()->create($this->supplierPayload($request->validated()));
 
         return response()->json([
             'message' => 'Supplier created successfully.',
@@ -124,10 +123,14 @@ class SupplierController extends Controller
             return $response;
         }
 
-        $updatedSupplier = $this->supplierService->updateSupplier(
-            $supplier,
-            $request->validated()
-        );
+        $attributes = $request->validated();
+
+        if (($attributes['is_active'] ?? false) === true && ! array_key_exists('is_deleted', $attributes)) {
+            $attributes['is_deleted'] = false;
+        }
+
+        $supplier->update($this->supplierPayload($attributes, $supplier));
+        $updatedSupplier = $supplier->refresh();
 
         return response()->json([
             'message' => 'Supplier updated successfully.',
@@ -147,7 +150,7 @@ class SupplierController extends Controller
         }
 
         try {
-            $this->supplierService->deleteSupplier($supplier);
+            $supplier->markDeleted();
 
             return response()->json([
                 'message' => 'Supplier deleted successfully.',
@@ -165,20 +168,24 @@ class SupplierController extends Controller
      */
     private function ensureAdminWithAnyPermission(Request $request, array $permissionKeys): ?JsonResponse
     {
-        if ($response = $this->ensureAdmin($request)) {
-            return $response;
-        }
+        return $this->ensureAdmin($request);
+    }
 
-        $user = $request->user();
-
-        foreach ($permissionKeys as $permissionKey) {
-            if ($user->hasAdminPermission($permissionKey)) {
-                return null;
-            }
-        }
-
-        return response()->json([
-            'message' => 'You do not have permission to access this resource.',
-        ], 403);
+    /**
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    private function supplierPayload(array $attributes, ?Supplier $supplier = null): array
+    {
+        return [
+            'supplier_code' => $attributes['supplier_code'] ?? $supplier?->supplier_code,
+            'name' => $attributes['name'] ?? $supplier?->name,
+            'contact_name' => $attributes['contact_name'] ?? $supplier?->contact_name,
+            'phone' => $attributes['phone'] ?? $supplier?->phone,
+            'email' => $attributes['email'] ?? $supplier?->email,
+            'address' => $attributes['address'] ?? $supplier?->address,
+            'is_active' => $attributes['is_active'] ?? $supplier?->is_active ?? true,
+            'is_deleted' => $attributes['is_deleted'] ?? $supplier?->is_deleted ?? false,
+        ];
     }
 }

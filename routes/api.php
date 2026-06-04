@@ -1,7 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AccountController;
-use App\Http\Controllers\Api\Admin\AccessController as AdminAccessController;
+use App\Http\Controllers\Api\Admin\AdminAccountController as AdminAdminAccountController;
 use App\Http\Controllers\Api\Admin\CommunityController as AdminCommunityController;
 use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
@@ -16,8 +16,8 @@ use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ComplaintController;
 use App\Http\Controllers\Api\GhnLocationController;
-use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\NewsletterSubscriptionController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OperationController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PostController;
@@ -27,11 +27,9 @@ use App\Http\Controllers\Api\SupportTicketController;
 use App\Http\Controllers\Api\SupplierController;
 use Illuminate\Support\Facades\Route;
 
-// Public Auth Routes
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
-// Public product APIs
 Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/{id}', [ProductController::class, 'show']);
 Route::get('/regions', [RegionController::class, 'index']);
@@ -40,22 +38,20 @@ Route::get('/shipping/ghn/provinces', [GhnLocationController::class, 'provinces'
 Route::get('/shipping/ghn/districts', [GhnLocationController::class, 'districts']);
 Route::get('/shipping/ghn/wards', [GhnLocationController::class, 'wards']);
 
-// Public post APIs
 Route::get('/posts', [PostController::class, 'index']);
 
-// Public Category Routes
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/categories/{category}', [CategoryController::class, 'show']);
 Route::get('/categories/{category}/products', [CategoryController::class, 'getProducts']);
 
-// Public Supplier Routes
 Route::get('/suppliers', [SupplierController::class, 'index']);
 Route::get('/suppliers/{supplier}', [SupplierController::class, 'show']);
 Route::get('/suppliers/{supplier}/products', [SupplierController::class, 'getProducts']);
+Route::get('/test', function () {
+    return 'ok';
+});
 
-// Protected Routes
 Route::middleware('auth:sanctum')->group(function (): void {
-    // Auth Routes
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/account/profile', [AccountController::class, 'show']);
@@ -78,7 +74,6 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/posts/{post}/likes', [PostController::class, 'like']);
     Route::delete('/posts/{post}/likes', [PostController::class, 'unlike']);
 
-    // Customer Cart & Order Routes
     Route::get('/cart', [CartController::class, 'show']);
     Route::post('/cart/items', [CartController::class, 'storeItem']);
     Route::patch('/cart/items/{cartItem}', [CartController::class, 'updateItem']);
@@ -126,19 +121,11 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('/users', [AdminUserController::class, 'store']);
         Route::put('/users/{user}', [AdminUserController::class, 'update']);
         Route::delete('/users/{user}', [AdminUserController::class, 'destroy']);
-
-        Route::prefix('access')->group(function (): void {
-            Route::get('/permissions', [AdminAccessController::class, 'permissions']);
-            Route::get('/roles', [AdminAccessController::class, 'roles']);
-            Route::post('/roles', [AdminAccessController::class, 'storeRole']);
-            Route::put('/roles/{role}', [AdminAccessController::class, 'updateRole']);
-            Route::delete('/roles/{role}', [AdminAccessController::class, 'destroyRole']);
-            Route::get('/admins', [AdminAccessController::class, 'admins']);
-            Route::post('/admins', [AdminAccessController::class, 'storeAdmin']);
-            Route::put('/admins/{admin}', [AdminAccessController::class, 'updateAdmin']);
-            Route::patch('/admins/{admin}/status', [AdminAccessController::class, 'updateAdminStatus']);
-            Route::patch('/admins/{admin}/password', [AdminAccessController::class, 'updateAdminPassword']);
-        });
+        Route::get('/admins', [AdminAdminAccountController::class, 'index']);
+        Route::post('/admins', [AdminAdminAccountController::class, 'store']);
+        Route::put('/admins/{admin}', [AdminAdminAccountController::class, 'update']);
+        Route::patch('/admins/{admin}/status', [AdminAdminAccountController::class, 'updateStatus']);
+        Route::patch('/admins/{admin}/password', [AdminAdminAccountController::class, 'updatePassword']);
 
         Route::get('/products', [AdminProductController::class, 'index']);
         Route::get('/products/{id}', [AdminProductController::class, 'show']);
@@ -157,7 +144,6 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::delete('/orders/{order}/shipment', [AdminOrderShipmentController::class, 'destroy']);
     });
 
-    // Admin Category Routes
     Route::prefix('admin/categories')->group(function (): void {
         Route::get('/', [CategoryController::class, 'adminIndex']);
         Route::post('/', [CategoryController::class, 'store']);
@@ -165,7 +151,6 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::delete('/{category}', [CategoryController::class, 'destroy']);
     });
 
-    // Admin Supplier Routes
     Route::prefix('admin/suppliers')->group(function (): void {
         Route::get('/', [SupplierController::class, 'adminIndex']);
         Route::post('/', [SupplierController::class, 'store']);

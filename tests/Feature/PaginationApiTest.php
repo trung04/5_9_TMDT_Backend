@@ -132,7 +132,7 @@ class PaginationApiTest extends TestCase
             ->assertJsonPath('total', 2)
             ->assertJsonCount(1, 'data');
 
-        $this->withToken($token)->getJson('/api/admin/access/admins?per_page=1')
+        $this->withToken($token)->getJson('/api/admin/admins?per_page=1')
             ->assertOk()
             ->assertJsonPath('per_page', 1)
             ->assertJsonPath('total', 1)
@@ -314,8 +314,7 @@ class PaginationApiTest extends TestCase
 
         return User::query()
             ->where('email', config('admin_access.super_admin.email'))
-            ->firstOrFail()
-            ->load('adminRole.permissions');
+            ->firstOrFail();
     }
 
     private function superAdminToken(): string

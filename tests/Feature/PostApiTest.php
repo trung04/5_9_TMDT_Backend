@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\AdminRole;
 use App\Models\Post;
 use App\Models\PostComment;
 use App\Models\PostLike;
@@ -175,8 +174,7 @@ class PostApiTest extends TestCase
         $this->seed(AdminAccessSeeder::class);
 
         return User::query()
-            ->whereHas('adminRole', fn ($query) => $query->where('slug', AdminRole::SUPER_ADMIN_SLUG))
-            ->firstOrFail()
-            ->load(['adminRole.permissions']);
+            ->where('email', config('admin_access.super_admin.email'))
+            ->firstOrFail();
     }
 }

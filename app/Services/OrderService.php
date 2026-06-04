@@ -264,6 +264,10 @@ class OrderService
             $query->where('user_id', (int) $filters['user_id']);
         }
 
+        if (! empty($filters['queue']) && is_string($filters['queue'])) {
+            $this->applyAdminQueueFilter($query, $filters['queue']);
+        }
+
         if (! empty($filters['status'])) {
             $query->where('status', (string) $filters['status']);
         }
@@ -292,6 +296,21 @@ class OrderService
             ->where('id', $orderId)
             ->with($this->orderRelations())
             ->first();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function adminQueueOptions(): array
+    {
+        return [
+            'pending_orders' => 'Đơn mới chờ xác nhận',
+            'bank_transfer_pending' => 'Đơn chuyển khoản chờ xác nhận',
+            'confirmed_orders' => 'Đơn đã xác nhận cần đóng gói',
+            'packed_orders' => 'Đơn đã đóng gói cần giao',
+            'shipped_orders' => 'Đơn đang giao',
+            'delivery_failed_orders' => 'Đơn giao thất bại cần xử lý',
+        ];
     }
 
     public function confirmBankTransferSubmitted(Order $order, User $actor, ?string $note = null): Order
@@ -686,6 +705,24 @@ class OrderService
             'created_at' => $order->created_at,
             'updated_at' => $order->updated_at,
         ];
+    }
+
+    private function applyAdminQueueFilter($query, string $queue): void
+    {
+        match ($queue) {
+            'pending_orders' => $query->where('status', Order::STATUS_PENDING),
+            'bank_transfer_pending' => $query
+                ->where('payment_method', Order::PAYMENT_METHOD_BANK_TRANSFER)
+                ->whereNotIn('status', [Order::STATUS_CANCELLED, Order::STATUS_DELIVERED])
+                ->whereHas('payment', function ($paymentQuery): void {
+                    $paymentQuery->where('payment_status', Payment::STATUS_PENDING);
+                }),
+            'confirmed_orders' => $query->where('status', Order::STATUS_CONFIRMED),
+            'packed_orders' => $query->where('status', Order::STATUS_PACKED),
+            'shipped_orders' => $query->where('status', Order::STATUS_SHIPPED),
+            'delivery_failed_orders' => $query->where('status', Order::STATUS_DELIVERY_FAILED),
+            default => null,
+        };
     }
 
     /**

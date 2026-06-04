@@ -115,8 +115,7 @@ class AdminCatalogApiTest extends TestCase
         /** @var User $admin */
         $admin = User::query()
             ->where('email', config('admin_access.super_admin.email'))
-            ->firstOrFail()
-            ->load('adminRole.permissions');
+            ->firstOrFail();
 
         return $admin->createToken('test')->plainTextToken;
     }
