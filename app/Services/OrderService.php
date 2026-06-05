@@ -56,7 +56,7 @@ class OrderService
         ],
         'PACK' => [
             'status' => Order::STATUS_PACKED,
-            'success_message' => 'Da xac nhan dong goi don hang.',
+            'success_message' => 'Đã xác nhận đóng gói đơn hàng.',
         ],
         'SHIP' => [
             'status' => Order::STATUS_SHIPPED,
@@ -91,7 +91,7 @@ class OrderService
 
             if (! $cart) {
                 throw ValidationException::withMessages([
-                    'cart' => ['Gio hang dang trong.'],
+                    'cart' => ['Giỏ hàng đang trống.'],
                 ]);
             }
 
@@ -104,7 +104,7 @@ class OrderService
 
             if ($cartItems->isEmpty()) {
                 throw ValidationException::withMessages([
-                    'cart' => ['Gio hang dang trong.'],
+                    'cart' => ['Giỏ hàng đang trống.'],
                 ]);
             }
 
@@ -215,7 +215,7 @@ class OrderService
                 'changed_by_user_id' => $user->id,
                 'from_status' => null,
                 'to_status' => Order::STATUS_PENDING,
-                'note' => sprintf('Don hang duoc tao voi phuong thuc thanh toan %s.', $paymentMethod),
+                'note' => sprintf('Đơn hàng được tạo với phương thức thanh toán %s.', $paymentMethod),
                 'changed_at' => now(),
             ]);
 
@@ -225,7 +225,7 @@ class OrderService
                 'changed_by_user_id' => $user->id,
                 'from_status' => null,
                 'to_status' => Payment::STATUS_PENDING,
-                'note' => 'Khoi tao trang thai thanh toan khi khach dat hang.',
+                'note' => 'Khởi tạo trạng thái thanh toán khi khách đặt hàng.',
                 'changed_at' => now(),
             ]);
 
@@ -323,13 +323,13 @@ class OrderService
 
             if ($payment->payment_method !== Order::PAYMENT_METHOD_BANK_TRANSFER) {
                 throw ValidationException::withMessages([
-                    'payment_method' => ['Chi don chuyen khoan moi co the xac nhan da chuyen tien.'],
+                    'payment_method' => ['Chỉ đơn chuyển khoản mới có thể xác nhận đã chuyển tiền.'],
                 ]);
             }
 
             if ($payment->payment_status !== Payment::STATUS_PENDING) {
                 throw ValidationException::withMessages([
-                    'payment_status' => ['Don chuyen khoan nay khong con o trang thai cho xac nhan.'],
+                    'payment_status' => ['Đơn chuyển khoản này không còn ở trạng thái chờ xác nhận.'],
                 ]);
             }
 
@@ -348,8 +348,8 @@ class OrderService
                 'from_status' => $order->status,
                 'to_status' => $order->status,
                 'note' => $note
-                    ? "Khach da bao da chuyen khoan. Ghi chu: {$note}"
-                    : 'Khach da bao da chuyen khoan va dang cho admin xac nhan.',
+                    ? "Khách đã báo đã chuyển khoản. Ghi chú: {$note}"
+                    : 'Khách đã báo đã chuyển khoản và đang chờ admin xác nhận.',
                 'changed_at' => now(),
             ]);
 
@@ -361,7 +361,7 @@ class OrderService
     {
         if ($order->status !== Order::STATUS_SHIPPED) {
             throw ValidationException::withMessages([
-                'status' => ['Chi don dang giao moi co the xac nhan da nhan hang.'],
+                'status' => ['Chỉ đơn đang giao mới có thể xác nhận đã nhận hàng.'],
             ]);
         }
 
@@ -369,7 +369,7 @@ class OrderService
             $order,
             Order::STATUS_DELIVERED,
             $actor,
-            'Khach hang da xac nhan nhan duoc hang.',
+            'Khách hàng đã xác nhận nhận được hàng.',
         );
     }
 
@@ -521,7 +521,7 @@ class OrderService
                 'changed_by_user_id' => $actor->id,
                 'from_status' => $currentStatus,
                 'to_status' => $nextStatus,
-                'note' => $note ?: sprintf('Cap nhat trang thai thanh toan sang %s.', $nextStatus),
+                'note' => $note ?: sprintf('Cập nhật trạng thái thanh toán sang %s.', $nextStatus),
                 'changed_at' => now(),
             ]);
 
@@ -825,7 +825,7 @@ class OrderService
                 'BANK-' . $transactionCode,
                 Payment::STATUS_PENDING,
                 [
-                    'instructions' => 'Chuyen khoan dung so tien don hang va cho admin xac nhan.',
+                    'instructions' => 'Chuyển khoản đúng số tiền đơn hàng và chờ admin xác nhận.',
                     'bank_name' => 'MB Bank',
                     'account_name' => 'HERITAGE HARVEST',
                     'account_number' => '0123456789',
@@ -938,7 +938,7 @@ class OrderService
     {
         if (! in_array($nextStatus, $this->allowedNextStatuses($order), true)) {
             throw ValidationException::withMessages([
-                'status' => ['Khong the chuyen don hang sang trang thai da chon.'],
+                'status' => ['Không thể chuyển đơn hàng sang trạng thái đã chọn.'],
             ]);
         }
     }
@@ -949,7 +949,7 @@ class OrderService
 
         if (! $order->shipment || $order->shipment->cancelled_at || ! $order->shipment->tracking_code) {
             throw ValidationException::withMessages([
-                'shipment' => ['Can tao van don truoc khi ban giao cho van chuyen.'],
+                'shipment' => ['Cần tạo vận đơn trước khi bàn giao cho vận chuyển.'],
             ]);
         }
     }
@@ -958,7 +958,7 @@ class OrderService
     {
         if (! in_array($nextStatus, $this->allowedNextPaymentStatuses($payment, $order), true)) {
             throw ValidationException::withMessages([
-                'payment_status' => ['Khong the chuyen trang thai thanh toan sang gia tri da chon.'],
+                'payment_status' => ['Không thể chuyển trạng thái thanh toán sang giá trị đã chọn.'],
             ]);
         }
 
@@ -967,7 +967,7 @@ class OrderService
             && ! in_array($order->status, [Order::STATUS_CANCELLED, Order::STATUS_DELIVERY_FAILED], true)
         ) {
             throw ValidationException::withMessages([
-                'payment_status' => ['Chi duoc refund khi don da bi huy hoac giao hang that bai.'],
+                'payment_status' => ['Chỉ được hoàn tiền khi đơn đã bị hủy hoặc giao hàng thất bại.'],
             ]);
         }
 
@@ -977,7 +977,7 @@ class OrderService
             && $order->status !== Order::STATUS_DELIVERED
         ) {
             throw ValidationException::withMessages([
-                'payment_status' => ['Khong duoc xac nhan thanh toan COD truoc khi don giao thanh cong.'],
+                'payment_status' => ['Không được xác nhận thanh toán COD trước khi đơn giao thành công.'],
             ]);
         }
     }
@@ -988,13 +988,13 @@ class OrderService
 
         if (! $payment) {
             throw ValidationException::withMessages([
-                'payment' => ['Don hang chua co ban ghi thanh toan.'],
+                'payment' => ['Đơn hàng chưa có bản ghi thanh toán.'],
             ]);
         }
 
         if ($payment->payment_status === Payment::STATUS_FAILED) {
             throw ValidationException::withMessages([
-                'payment_status' => ['Khong the xac nhan don vi thanh toan da that bai.'],
+                'payment_status' => ['Không thể xác nhận đơn vì thanh toán đã thất bại.'],
             ]);
         }
 
@@ -1003,7 +1003,7 @@ class OrderService
             && $payment->payment_status !== Payment::STATUS_SUCCESS
         ) {
             throw ValidationException::withMessages([
-                'payment_status' => ['Don chuyen khoan can xac nhan thanh toan truoc khi xac nhan don.'],
+                'payment_status' => ['Đơn chuyển khoản cần xác nhận thanh toán trước khi xác nhận đơn.'],
             ]);
         }
     }
@@ -1032,7 +1032,7 @@ class OrderService
     {
         if (! $order->stock_deducted) {
             throw ValidationException::withMessages([
-                'stock' => ['Don hang chua tru kho nen chua the dong goi.'],
+                'stock' => ['Đơn hàng chưa trừ kho nên chưa thể đóng gói.'],
             ]);
         }
 
@@ -1040,7 +1040,7 @@ class OrderService
 
         if (! $order->shipment || $order->shipment->cancelled_at || ! $order->shipment->tracking_code) {
             throw ValidationException::withMessages([
-                'shipment' => ['Can tao van don truoc khi xac nhan da dong goi.'],
+                'shipment' => ['Cần tạo vận đơn trước khi xác nhận đã đóng gói.'],
             ]);
         }
     }
@@ -1337,7 +1337,7 @@ class OrderService
             'changed_by_user_id' => $actor->id,
             'from_status' => $fromStatus,
             'to_status' => Payment::STATUS_SUCCESS,
-            'note' => 'Tu dong xac nhan thanh toan COD khi don da giao thanh cong.',
+            'note' => 'Tự động xác nhận thanh toán COD khi đơn đã giao thành công.',
             'changed_at' => now(),
         ]);
     }

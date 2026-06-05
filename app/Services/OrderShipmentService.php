@@ -318,7 +318,10 @@ class OrderShipmentService
 
     private function attachShipmentToOrder(Order $order, OrderShipment $shipment, User $actor, ?string $note): void
     {
+        $fromStatus = $order->status;
+
         $order->update([
+            'status' => Order::STATUS_PACKED,
             'shipping_carrier' => $shipment->carrier?->name ?? $shipment->provider,
             'shipping_code' => $shipment->tracking_code,
         ]);
@@ -326,8 +329,8 @@ class OrderShipmentService
         OrderStatusHistory::query()->create([
             'order_id' => $order->id,
             'changed_by_user_id' => $actor->id,
-            'from_status' => $order->status,
-            'to_status' => $order->status,
+            'from_status' => $fromStatus,
+            'to_status' => Order::STATUS_PACKED,
             'note' => $note ?: 'Da tao van don.',
             'changed_at' => now(),
         ]);

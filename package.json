@@ -1,0 +1,19 @@
+{
+    "name": "5_9_tmdt_backend",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "vite build",
+        "dev": "vite --host 127.0.0.1",
+        "serve": "php artisan serve --host=127.0.0.1 --port=8000",
+        "web": "concurrently -k -n laravel,vite -c blue,green \"npm run serve\" \"npm run dev\""
+    },
+    "devDependencies": {
+        "autoprefixer": "^10.4.21",
+        "concurrently": "^9.2.1",
+        "laravel-vite-plugin": "^2.0.0",
+        "postcss": "^8.5.6",
+        "tailwindcss": "^3.4.17",
+        "vite": "^7.1.10"
+    }
+}

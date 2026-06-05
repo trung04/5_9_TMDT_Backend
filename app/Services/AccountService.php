@@ -79,7 +79,7 @@ class AccountService
     {
         if (! Hash::check($currentPassword, $user->password_hash)) {
             throw ValidationException::withMessages([
-                'current_password' => ['Current password is incorrect.'],
+                'current_password' => ['Mật khẩu hiện tại không đúng.'],
             ]);
         }
 
@@ -178,7 +178,7 @@ class AccountService
     public function markNotificationRead(User $user, Notification $notification): Notification
     {
         if ($notification->user_id !== $user->id) {
-            abort(404, 'Notification not found.');
+            abort(404, 'Không tìm thấy thông báo.');
         }
 
         if (! $notification->read_at) {
@@ -217,7 +217,7 @@ class AccountService
 
         if (! $order) {
             throw ValidationException::withMessages([
-                'order_id' => ['Order does not belong to the authenticated user.'],
+                'order_id' => ['Đơn hàng không thuộc tài khoản hiện tại.'],
             ]);
         }
 
@@ -225,7 +225,7 @@ class AccountService
 
         if (! $product) {
             throw ValidationException::withMessages([
-                'product_id' => ['Product not found.'],
+                'product_id' => ['Không tìm thấy sản phẩm.'],
             ]);
         }
 
@@ -244,7 +244,7 @@ class AccountService
     {
         if ($pointsCost > (int) $user->reward_points) {
             throw ValidationException::withMessages([
-                'points_cost' => ['Insufficient reward points.'],
+                'points_cost' => ['Không đủ điểm thưởng.'],
             ]);
         }
 
@@ -400,7 +400,7 @@ class AccountService
     private function assertAddressOwner(User $user, UserAddress $address): void
     {
         if ($address->user_id !== $user->id) {
-            abort(404, 'Address not found.');
+            abort(404, 'Không tìm thấy địa chỉ.');
         }
     }
 
@@ -424,17 +424,17 @@ class AccountService
     {
         return match ($tier) {
             'Gold' => [
-                'Uu tien xu ly don hang',
-                'Qua tang dac san theo mua',
-                'Giam phi van chuyen',
+                'Ưu tiên xử lý đơn hàng',
+                'Quà tặng đặc sản theo mùa',
+                'Giảm phí vận chuyển',
             ],
             'Silver' => [
-                'Tich diem nhanh hon',
-                'Nhan uu dai theo mua',
+                'Tích điểm nhanh hơn',
+                'Nhận ưu đãi theo mùa',
             ],
             default => [
-                'Tich diem sau moi don hang',
-                'Nhan thong bao uu dai thanh vien',
+                'Tích điểm sau mỗi đơn hàng',
+                'Nhận thông báo ưu đãi thành viên',
             ],
         };
     }

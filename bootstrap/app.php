@@ -30,6 +30,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin.web' => \App\Http\Middleware\EnsureAdminWebAccess::class,
             'admin.web.guest' => \App\Http\Middleware\RedirectIfAdminWebAuthenticated::class,
+            'customer.web' => \App\Http\Middleware\EnsureCustomerWebAccess::class,
+            'portal.web' => \App\Http\Middleware\EnsurePortalWebAccess::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

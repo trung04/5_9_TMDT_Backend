@@ -41,7 +41,11 @@
             "@php artisan migrate --force"
         ],
         "dev": [
-            "@php artisan serve"
+            "Composer\\Config::disableProcessTimeout",
+            "npm run web"
+        ],
+        "serve": [
+            "@php artisan serve --host=127.0.0.1 --port=8000"
         ],
         "test": [
             "@php artisan config:clear --ansi",

@@ -1,14 +1,14 @@
 # 5_9_TMDT Backend
 
-Laravel API backend for the 5_9_TMDT ecommerce project.
-
-The React admin/customer frontend is a separate project in `../5_9_TMDT_Frontend`.
-This backend does not build or serve frontend assets.
+Laravel ecommerce backend with a standalone Blade website. The customer
+storefront, admin web pages, and API all run from this folder; the separate
+`../5_9_TMDT_Frontend` project is not required to open the website.
 
 ## Requirements
 
 - PHP >= 8.2
 - Composer
+- Node.js + npm
 - MySQL 8+
 
 ## Install
@@ -17,6 +17,7 @@ Run these commands from `5_9_TMDT_Backend`:
 
 ```bash
 composer install
+npm install
 copy .env.example .env
 php artisan key:generate
 ```
@@ -43,8 +44,8 @@ CREATE DATABASE ecommerce_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 Import the schema and seed data:
 
 ```bash
-mysql -u root -p ecommerce_db < ecommerce_schema_mysql.sql
-mysql -u root -p ecommerce_db < ecommerce_seed_data.sql
+mysql -u root -p ecommerce_db < database/ecommerce_schema_mysql.sql
+mysql -u root -p ecommerce_db < database/ecommerce_seed_data.sql
 ```
 
 You can also use Laravel migrations when that fits your local workflow:
@@ -53,12 +54,13 @@ You can also use Laravel migrations when that fits your local workflow:
 php artisan migrate --seed
 ```
 
-## Run
+## Run the Website
 
-Start the API server:
+For local development with Vite hot reload, run one command from this backend
+folder:
 
 ```bash
-php artisan serve
+npm run web
 ```
 
 Or use the Composer shortcut:
@@ -67,10 +69,24 @@ Or use the Composer shortcut:
 composer run dev
 ```
 
+Then open:
+
+```text
+Customer website: http://127.0.0.1:8000/
+Admin website:    http://127.0.0.1:8000/admin-web/login
+```
+
+For a single Laravel server without the Vite dev server, build the assets first:
+
+```bash
+npm run build
+php artisan serve --host=127.0.0.1 --port=8000
+```
+
 Backend health check:
 
 ```text
-GET http://127.0.0.1:8000/
+GET http://127.0.0.1:8000/backend-status
 ```
 
 API routes are mounted under:
