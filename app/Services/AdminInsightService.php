@@ -32,7 +32,11 @@ class AdminInsightService
         [$rangeStart, $rangeEnd] = $this->resolveDateRange($filters);
         [$chartStart, $chartEnd, $chartRange] = $this->resolveChartRange($filters, $rangeStart, $rangeEnd);
 
-        $successfulOrdersQuery = $this->successfulRevenueOrdersQuery();
+        $successfulOrdersQuery = $this->applyDeliveredBetween(
+            $this->successfulRevenueOrdersQuery(),
+            $rangeStart,
+            $rangeEnd,
+        );
         $totalRevenue = (float) (clone $successfulOrdersQuery)->sum('total_amount');
         $successfulOrdersCount = (int) (clone $successfulOrdersQuery)->count();
         $averageOrderValue = $successfulOrdersCount > 0
@@ -49,24 +53,30 @@ class AdminInsightService
             now()->copy()->startOfMonth(),
             now()->copy()->endOfMonth(),
         )->sum('total_amount');
-        $rangeRevenue = (float) $this->applyDeliveredBetween(
-            $this->successfulRevenueOrdersQuery(),
-            $rangeStart,
-            $rangeEnd,
-        )->sum('total_amount');
+        $rangeRevenue = $totalRevenue;
 
-        $processingOrdersCount = Order::query()->whereIn('status', [
+        $processingOrdersCount = $this->applyCreatedBetween(Order::query(), $rangeStart, $rangeEnd)->whereIn('status', [
             Order::STATUS_PENDING,
             Order::STATUS_CONFIRMED,
             Order::STATUS_PACKED,
             Order::STATUS_SHIPPED,
         ])->count();
-        $pendingOrdersCount = Order::query()->where('status', Order::STATUS_PENDING)->count();
-        $shippingOrdersCount = Order::query()->where('status', Order::STATUS_SHIPPED)->count();
-        $deliveryFailedOrdersCount = Order::query()->where('status', Order::STATUS_DELIVERY_FAILED)->count();
-        $orderStatusCounts = Order::query()
-            ->select('status')
-            ->selectRaw('COUNT(*) as orders_count')
+        $pendingOrdersCount = $this->applyCreatedBetween(Order::query(), $rangeStart, $rangeEnd)
+            ->where('status', Order::STATUS_PENDING)
+            ->count();
+        $shippingOrdersCount = $this->applyCreatedBetween(Order::query(), $rangeStart, $rangeEnd)
+            ->where('status', Order::STATUS_SHIPPED)
+            ->count();
+        $deliveryFailedOrdersCount = $this->applyCreatedBetween(Order::query(), $rangeStart, $rangeEnd)
+            ->where('status', Order::STATUS_DELIVERY_FAILED)
+            ->count();
+        $orderStatusCounts = $this->applyCreatedBetween(
+            Order::query()
+                ->select('status')
+                ->selectRaw('COUNT(*) as orders_count'),
+            $rangeStart,
+            $rangeEnd,
+        )
             ->groupBy('status')
             ->pluck('orders_count', 'status');
         $orderStatusChart = collect(Order::allowedStatuses())
@@ -77,7 +87,7 @@ class AdminInsightService
             ])
             ->all();
 
-        $bankTransferPendingBase = Order::query()
+        $bankTransferPendingBase = $this->applyCreatedBetween(Order::query(), $rangeStart, $rangeEnd)
             ->where('payment_method', Order::PAYMENT_METHOD_BANK_TRANSFER)
             ->whereNotIn('status', [Order::STATUS_CANCELLED, Order::STATUS_DELIVERED])
             ->whereHas('payment', function (Builder $paymentQuery): void {
@@ -112,8 +122,9 @@ class AdminInsightService
 
         $bestSellingProducts = OrderItem::query()
             ->selectRaw('product_id, SUM(quantity) as sold_quantity, SUM(line_total) as revenue_amount')
-            ->whereHas('order', function (Builder $query): void {
+            ->whereHas('order', function (Builder $query) use ($rangeStart, $rangeEnd): void {
                 $this->applySuccessfulRevenueConstraints($query);
+                $this->applyDeliveredBetween($query, $rangeStart, $rangeEnd);
             })
             ->groupBy('product_id')
             ->orderByDesc('sold_quantity')
@@ -146,6 +157,7 @@ class AdminInsightService
             ->join('payments', 'payments.order_id', '=', 'orders.id')
             ->where('orders.status', Order::STATUS_DELIVERED)
             ->where('payments.payment_status', Payment::STATUS_SUCCESS)
+            ->whereBetween('orders.delivered_at', [$rangeStart->copy(), $rangeEnd->copy()])
             ->groupBy('users.id', 'users.full_name', 'users.email')
             ->orderByDesc('total_revenue')
             ->limit(5)
@@ -162,7 +174,7 @@ class AdminInsightService
             ])
             ->all();
         
-        $recentOrders = Order::query()
+        $recentOrders = $this->applyCreatedBetween(Order::query(), $rangeStart, $rangeEnd)
             ->with(['payment', 'user'])
             ->latest('id')
             ->limit(10)
@@ -175,13 +187,13 @@ class AdminInsightService
                 'key' => 'pending_orders',
                 'label' => 'Đơn mới chờ xác nhận',
                 'count' => $pendingOrdersCount,
-                'orders' => $this->taskOrders(fn (Builder $query) => $query->where('status', Order::STATUS_PENDING)),
+                'orders' => $this->taskOrders($rangeStart, $rangeEnd, fn (Builder $query) => $query->where('status', Order::STATUS_PENDING)),
             ],
             [
                 'key' => 'bank_transfer_pending',
                 'label' => 'Đơn chuyển khoản chờ xác nhận',
                 'count' => $bankTransferPendingCount,
-                'orders' => $this->taskOrders(function (Builder $query): void {
+                'orders' => $this->taskOrders($rangeStart, $rangeEnd, function (Builder $query): void {
                     $query->where('payment_method', Order::PAYMENT_METHOD_BANK_TRANSFER)
                         ->whereNotIn('status', [Order::STATUS_CANCELLED, Order::STATUS_DELIVERED])
                         ->whereHas('payment', function (Builder $paymentQuery): void {
@@ -192,26 +204,30 @@ class AdminInsightService
             [
                 'key' => 'confirmed_orders',
                 'label' => 'Đơn đã xác nhận cần đóng gói',
-                'count' => Order::query()->where('status', Order::STATUS_CONFIRMED)->count(),
-                'orders' => $this->taskOrders(fn (Builder $query) => $query->where('status', Order::STATUS_CONFIRMED)),
+                'count' => $this->applyCreatedBetween(Order::query(), $rangeStart, $rangeEnd)
+                    ->where('status', Order::STATUS_CONFIRMED)
+                    ->count(),
+                'orders' => $this->taskOrders($rangeStart, $rangeEnd, fn (Builder $query) => $query->where('status', Order::STATUS_CONFIRMED)),
             ],
             [
                 'key' => 'packed_orders',
                 'label' => 'Đơn đã đóng gói cần giao',
-                'count' => Order::query()->where('status', Order::STATUS_PACKED)->count(),
-                'orders' => $this->taskOrders(fn (Builder $query) => $query->where('status', Order::STATUS_PACKED)),
+                'count' => $this->applyCreatedBetween(Order::query(), $rangeStart, $rangeEnd)
+                    ->where('status', Order::STATUS_PACKED)
+                    ->count(),
+                'orders' => $this->taskOrders($rangeStart, $rangeEnd, fn (Builder $query) => $query->where('status', Order::STATUS_PACKED)),
             ],
             [
                 'key' => 'shipped_orders',
                 'label' => 'Đơn đang giao',
                 'count' => $shippingOrdersCount,
-                'orders' => $this->taskOrders(fn (Builder $query) => $query->where('status', Order::STATUS_SHIPPED)),
+                'orders' => $this->taskOrders($rangeStart, $rangeEnd, fn (Builder $query) => $query->where('status', Order::STATUS_SHIPPED)),
             ],
             [
                 'key' => 'delivery_failed_orders',
                 'label' => 'Đơn giao thất bại cần xử lý',
                 'count' => $deliveryFailedOrdersCount,
-                'orders' => $this->taskOrders(fn (Builder $query) => $query->where('status', Order::STATUS_DELIVERY_FAILED)),
+                'orders' => $this->taskOrders($rangeStart, $rangeEnd, fn (Builder $query) => $query->where('status', Order::STATUS_DELIVERY_FAILED)),
             ],
         ];
 
@@ -392,13 +408,22 @@ class AdminInsightService
         return $query->whereBetween('delivered_at', [$start->copy(), $end->copy()]);
     }
 
+    private function applyCreatedBetween(Builder $query, Carbon $start, Carbon $end): Builder
+    {
+        return $query->whereBetween('created_at', [$start->copy(), $end->copy()]);
+    }
+
     /**
      * @param  callable(Builder): void  $scope
      * @return list<array<string, mixed>>
      */
-    private function taskOrders(callable $scope): array
+    private function taskOrders(Carbon $start, Carbon $end, callable $scope): array
     {
-        $query = Order::query()->with(['payment', 'user'])->latest('id')->limit(5);
+        $query = $this->applyCreatedBetween(
+            Order::query()->with(['payment', 'user']),
+            $start,
+            $end,
+        )->latest('id')->limit(5);
         $scope($query);
 
         return $query->get()->map(fn (Order $order): array => $this->orderSnapshot($order))->all();

@@ -72,6 +72,39 @@ class AdminWebSsrTest extends TestCase
             ->assertSee('04/06/2026 18:15');
     }
 
+    public function test_dashboard_date_range_changes_visible_operational_data(): void
+    {
+        $admin = $this->seededSuperAdmin();
+        $customer = User::factory()->create([
+            'full_name' => 'Dashboard Range Customer',
+        ]);
+
+        $this->createLogisticsOrder($customer, [
+            'order_no' => 'ORD-DASH-IN',
+            'status' => Order::STATUS_PENDING,
+            'created_at' => '2026-06-02 10:00:00',
+            'updated_at' => '2026-06-02 10:00:00',
+        ]);
+        $this->createLogisticsOrder($customer, [
+            'order_no' => 'ORD-DASH-OUT',
+            'status' => Order::STATUS_PENDING,
+            'created_at' => '2026-05-20 10:00:00',
+            'updated_at' => '2026-05-20 10:00:00',
+        ]);
+
+        $this->actingAs($admin, 'web')
+            ->get('/admin-web?date_from=2026-06-02T00:00&date_to=2026-06-02T23:59&chart_range=custom')
+            ->assertOk()
+            ->assertSee('ORD-DASH-IN')
+            ->assertDontSee('ORD-DASH-OUT');
+
+        $this->actingAs($admin, 'web')
+            ->get('/admin-web?date_from=2026-05-20T00:00&date_to=2026-05-20T23:59&chart_range=custom')
+            ->assertOk()
+            ->assertSee('ORD-DASH-OUT')
+            ->assertDontSee('ORD-DASH-IN');
+    }
+
     public function test_dashboard_renders_visual_chart_containers(): void
     {
         $admin = $this->seededSuperAdmin();
@@ -924,7 +957,7 @@ class AdminWebSsrTest extends TestCase
      */
     private function createLogisticsOrder(User $customer, array $orderAttributes = [], array $paymentAttributes = []): Order
     {
-        $order = Order::query()->create([
+        $orderData = [
             'user_id' => $customer->id,
             'order_no' => $orderAttributes['order_no'] ?? 'ORD-SSR-'.strtoupper(substr(uniqid(), -6)),
             'recipient_name' => $orderAttributes['recipient_name'] ?? $customer->full_name,
@@ -946,7 +979,19 @@ class AdminWebSsrTest extends TestCase
             'stock_deducted' => $orderAttributes['stock_deducted'] ?? false,
             'shipping_code' => $orderAttributes['shipping_code'] ?? null,
             'delivered_at' => $orderAttributes['delivered_at'] ?? null,
-        ]);
+        ];
+
+        $order = Order::query()->create($orderData);
+
+        $timestamps = [];
+        foreach (['created_at', 'updated_at'] as $timestampColumn) {
+            if (array_key_exists($timestampColumn, $orderAttributes)) {
+                $timestamps[$timestampColumn] = $orderAttributes[$timestampColumn];
+            }
+        }
+        if ($timestamps !== []) {
+            $order->forceFill($timestamps)->save();
+        }
 
         Payment::query()->create([
             'order_id' => $order->id,
