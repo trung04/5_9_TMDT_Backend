@@ -464,7 +464,7 @@ class OrderShipmentService
             ->map(fn ($item): string => "{$item->product_name_snapshot} x {$item->quantity}")
             ->implode('; ');
 
-        return [
+        $payload = [
             'payment_type_id' => (int) ($attributes['payment_type_id'] ?? $carrier->default_payment_type_id),
             'note' => (string) ($attributes['note'] ?? $order->note ?? ''),
             'required_note' => (string) ($attributes['required_note'] ?? $carrier->default_required_note),
@@ -503,6 +503,26 @@ class OrderShipmentService
                 'weight' => max(1, (int) floor($weight / max(1, $order->items->sum('quantity')))),
             ])->values()->all(),
         ];
+
+        if ($carrier->pickup_ward_code) {
+            $payload['return_ward_code'] = $carrier->pickup_ward_code;
+            $payload['from_ward_code'] = $carrier->pickup_ward_code;
+        }
+
+        if ($carrier->pickup_district_id) {
+            $payload['return_district_id'] = $carrier->pickup_district_id;
+            $payload['from_district_id'] = $carrier->pickup_district_id;
+        }
+
+        if ($order->shipping_ward_code) {
+            $payload['to_ward_code'] = $order->shipping_ward_code;
+        }
+
+        if ($order->shipping_district_id) {
+            $payload['to_district_id'] = $order->shipping_district_id;
+        }
+
+        return $payload;
     }
 
     private function ensureGhnAddressIsComplete(Order $order): void

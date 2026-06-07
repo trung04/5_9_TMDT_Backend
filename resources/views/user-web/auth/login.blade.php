@@ -9,10 +9,10 @@
             <div class="flex h-full flex-col justify-between">
                 <div>
                     <p class="text-sm font-bold uppercase tracking-[0.2em] text-white/70">Heritage Harvest</p>
-                    <h1 class="mt-4 text-4xl font-black tracking-tight">Tài khoản thành viên</h1>
+                    <h1 class="mt-4 text-4xl font-black tracking-tight">Đăng nhập</h1>
                     <p class="mt-4 leading-7 text-white/75">Quản lý đơn hàng, địa chỉ, điểm thưởng và danh sách sản phẩm yêu thích trong một không gian riêng.</p>
                 </div>
-                <div class="rounded-3xl bg-white/15 p-5 text-sm text-white/80">Khu vực thành viên đang chạy bằng phiên Laravel.</div>
+                <div class="rounded-3xl bg-white/15 p-5 text-sm text-white/80 mx-auto">Khu vực thành viên.</div>
             </div>
         </div>
         <div class="p-8 sm:p-12">

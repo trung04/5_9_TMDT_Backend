@@ -50,7 +50,7 @@ return new class extends Migration
             }
 
             if (! Schema::hasColumn('products', 'gallery')) {
-                $table->json('gallery')->nullable()->after('certifications');
+                $table->text('gallery')->nullable()->after('certifications');
             }
         });
 

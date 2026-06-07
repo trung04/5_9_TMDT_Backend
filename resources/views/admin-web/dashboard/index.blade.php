@@ -3,8 +3,34 @@
 @section('title', 'Bảng điều khiển')
 
 @section('content')
-    @php($labels = \App\Support\AdminWebLabel::class)
-    @php($canViewOrderDetails = $adminUser->hasAdminPermission('admin.orders.view'))
+    @php
+        $labels = \App\Support\AdminWebLabel::class;
+        $canViewOrderDetails = $adminUser->hasAdminPermission('admin.orders.view');
+        $revenueChart = collect($payload['revenue_chart'] ?? [])->values();
+        $orderStatusChart = collect($payload['order_status_chart'] ?? [])->values();
+        $topProductChart = collect($payload['featured_products'] ?? [])
+            ->filter(fn (array $product): bool => (int) ($product['sold_quantity'] ?? 0) > 0)
+            ->values();
+        $hasRevenueChartData = $revenueChart->sum('revenue') > 0 || $revenueChart->sum('successful_orders') > 0;
+        $hasOrderStatusChartData = $orderStatusChart->sum('count') > 0;
+        $hasTopProductChartData = $topProductChart->isNotEmpty();
+        $dashboardChartData = [
+            'revenue' => [
+                'labels' => $revenueChart->pluck('label')->all(),
+                'revenue' => $revenueChart->pluck('revenue')->map(fn ($value): float => (float) $value)->all(),
+                'orders' => $revenueChart->pluck('successful_orders')->map(fn ($value): int => (int) $value)->all(),
+            ],
+            'orderStatus' => [
+                'labels' => $orderStatusChart->pluck('label')->all(),
+                'counts' => $orderStatusChart->pluck('count')->map(fn ($value): int => (int) $value)->all(),
+            ],
+            'topProducts' => [
+                'labels' => $topProductChart->pluck('name')->map(fn ($value): string => \Illuminate\Support\Str::limit((string) $value, 26))->all(),
+                'sold' => $topProductChart->pluck('sold_quantity')->map(fn ($value): int => (int) $value)->all(),
+                'revenue' => $topProductChart->pluck('revenue')->map(fn ($value): float => (float) $value)->all(),
+            ],
+        ];
+    @endphp
 
     <div class="toolbar">
         <div>
@@ -47,6 +73,47 @@
                 <div class="value">{{ is_numeric($value) ? number_format((float) $value) : $value }}</div>
             </div>
         @endforeach
+    </div>
+
+    <div class="grid cols-2" style="margin-top: 20px;">
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="row between" style="margin-bottom: 12px;">
+                <div>
+                    <h3 style="margin-bottom: 4px;">Bieu do doanh thu</h3>
+                    <div class="small muted">{{ $payload['filters']['chart_period_label'] }}</div>
+                </div>
+                <span class="badge">{{ $payload['filters']['chart_range_label'] }}</span>
+            </div>
+            @if($hasRevenueChartData)
+                <div style="height: 320px;">
+                    <canvas id="dashboard-revenue-chart" data-dashboard-chart="revenue"></canvas>
+                </div>
+            @else
+                <div class="empty">Chua co doanh thu trong khoang bieu do nay.</div>
+            @endif
+        </div>
+
+        <div class="card">
+            <h3>Trang thai don hang</h3>
+            @if($hasOrderStatusChartData)
+                <div style="height: 280px;">
+                    <canvas id="dashboard-order-status-chart" data-dashboard-chart="order-status"></canvas>
+                </div>
+            @else
+                <div class="empty">Chua co don hang de thong ke trang thai.</div>
+            @endif
+        </div>
+
+        <div class="card">
+            <h3>Top san pham ban chay</h3>
+            @if($hasTopProductChartData)
+                <div style="height: 280px;">
+                    <canvas id="dashboard-top-products-chart" data-dashboard-chart="top-products"></canvas>
+                </div>
+            @else
+                <div class="empty">Chua co san pham ban thanh cong.</div>
+            @endif
+        </div>
     </div>
 
     <div class="grid cols-2" style="margin-top: 20px;">
@@ -172,3 +239,149 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script>
+        (() => {
+            const chartData = @json($dashboardChartData);
+            const currencyFormatter = new Intl.NumberFormat("vi-VN", {
+                style: "currency",
+                currency: "VND",
+                maximumFractionDigits: 0,
+            });
+            const numberFormatter = new Intl.NumberFormat("vi-VN");
+            const colors = ["#14532d", "#2563eb", "#d97706", "#7c3aed", "#dc2626", "#0891b2", "#64748b"];
+
+            Chart.defaults.font.family = '"Segoe UI", Tahoma, Geneva, Verdana, sans-serif';
+            Chart.defaults.color = "#5e6d81";
+
+            const revenueCanvas = document.getElementById("dashboard-revenue-chart");
+            if (revenueCanvas) {
+                new Chart(revenueCanvas, {
+                    data: {
+                        labels: chartData.revenue.labels,
+                        datasets: [
+                            {
+                                type: "bar",
+                                label: "Doanh thu",
+                                data: chartData.revenue.revenue,
+                                backgroundColor: "rgba(20, 83, 45, 0.22)",
+                                borderColor: "#14532d",
+                                borderWidth: 1,
+                                borderRadius: 6,
+                                yAxisID: "y",
+                            },
+                            {
+                                type: "line",
+                                label: "Don thanh cong",
+                                data: chartData.revenue.orders,
+                                borderColor: "#2563eb",
+                                backgroundColor: "#2563eb",
+                                pointRadius: 3,
+                                tension: 0.32,
+                                yAxisID: "y1",
+                            },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: "index", intersect: false },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { callback: (value) => currencyFormatter.format(value) },
+                            },
+                            y1: {
+                                beginAtZero: true,
+                                position: "right",
+                                grid: { drawOnChartArea: false },
+                                ticks: { precision: 0 },
+                            },
+                        },
+                        plugins: {
+                            legend: { position: "bottom" },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => context.dataset.yAxisID === "y"
+                                        ? `${context.dataset.label}: ${currencyFormatter.format(context.parsed.y)}`
+                                        : `${context.dataset.label}: ${numberFormatter.format(context.parsed.y)}`,
+                                },
+                            },
+                        },
+                    },
+                });
+            }
+
+            const statusCanvas = document.getElementById("dashboard-order-status-chart");
+            if (statusCanvas) {
+                new Chart(statusCanvas, {
+                    type: "doughnut",
+                    data: {
+                        labels: chartData.orderStatus.labels,
+                        datasets: [{
+                            data: chartData.orderStatus.counts,
+                            backgroundColor: colors,
+                            borderColor: "#ffffff",
+                            borderWidth: 2,
+                        }],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: "62%",
+                        plugins: {
+                            legend: { position: "bottom" },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => `${context.label}: ${numberFormatter.format(context.parsed)}`,
+                                },
+                            },
+                        },
+                    },
+                });
+            }
+
+            const productCanvas = document.getElementById("dashboard-top-products-chart");
+            if (productCanvas) {
+                new Chart(productCanvas, {
+                    type: "bar",
+                    data: {
+                        labels: chartData.topProducts.labels,
+                        datasets: [{
+                            label: "So luong ban",
+                            data: chartData.topProducts.sold,
+                            backgroundColor: "rgba(37, 99, 235, 0.22)",
+                            borderColor: "#2563eb",
+                            borderWidth: 1,
+                            borderRadius: 6,
+                            revenue: chartData.topProducts.revenue,
+                        }],
+                    },
+                    options: {
+                        indexAxis: "y",
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: { beginAtZero: true, ticks: { precision: 0 } },
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => {
+                                        const sold = numberFormatter.format(context.parsed.x);
+                                        const revenue = currencyFormatter.format(context.dataset.revenue[context.dataIndex] ?? 0);
+
+                                        return `Da ban: ${sold} - Doanh thu: ${revenue}`;
+                                    },
+                                },
+                            },
+                        },
+                    },
+                });
+            }
+        })();
+    </script>
+@endpush

@@ -40,6 +40,50 @@ class UserWebSsrTest extends TestCase
         $this->get('/register')->assertOk()->assertSee('Đăng ký');
     }
 
+    public function test_product_detail_renders_uploaded_image_gallery(): void
+    {
+        $product = $this->createProduct([
+            'name' => 'Gallery Product',
+            'slug' => 'gallery-product',
+            'image_url' => 'products/gallery-primary.jpg',
+            'gallery' => 'products/gallery-primary.jpg|products/gallery-secondary.jpg',
+        ]);
+
+        $this->get('/products/'.$product->slug)
+            ->assertOk()
+            ->assertSee('data-gallery-thumb', false)
+            ->assertSee('/storage/products/gallery-primary.jpg', false)
+            ->assertSee('/storage/products/gallery-secondary.jpg', false);
+    }
+
+    public function test_product_detail_falls_back_to_product_image_url_without_uploaded_images(): void
+    {
+        $product = $this->createProduct([
+            'name' => 'Fallback Image Product',
+            'slug' => 'fallback-image-product',
+            'image_url' => 'https://example.com/fallback.jpg',
+        ]);
+
+        $this->get('/products/'.$product->slug)
+            ->assertOk()
+            ->assertSee('https://example.com/fallback.jpg', false)
+            ->assertDontSee('data-gallery-thumb', false);
+    }
+
+    public function test_catalog_product_card_falls_back_to_first_gallery_image(): void
+    {
+        $this->createProduct([
+            'name' => 'Gallery Card Product',
+            'slug' => 'gallery-card-product',
+            'image_url' => null,
+            'gallery' => 'products/card-fallback.jpg|products/card-secondary.jpg',
+        ]);
+
+        $this->get('/products')
+            ->assertOk()
+            ->assertSee('/storage/products/card-fallback.jpg', false);
+    }
+
     public function test_guest_is_redirected_from_customer_only_pages(): void
     {
         $this->get('/account/profile')

@@ -21,17 +21,14 @@ class StoreProductRequest extends FormRequest
             'supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
             'region_id' => ['nullable', 'integer', 'exists:regions,id'],
             'sku' => ['required', 'string', 'max:80', 'unique:products,sku'],
-            'slug' => ['nullable', 'string', 'max:180', 'unique:products,slug'],
             'name' => ['required', 'string', 'max:180'],
             'description' => ['nullable', 'string'],
-            'short_description' => ['nullable', 'string'],
-            'image_url' => ['nullable', 'url', 'max:2048'],
-            'origin' => ['nullable', 'string', 'max:180'],
-            'weight' => ['nullable', 'string', 'max:80'],
-            'shelf_life' => ['nullable', 'string', 'max:120'],
-            'certifications' => ['nullable', 'array'],
-            'certifications.*' => ['string', 'max:120'],
-            'gallery' => ['nullable', 'array'],
+            'image_url' => $this->hasFile('image_url')
+                ? ['nullable', 'image', 'mimes:jpg,jpeg,png,webp']
+                : ['nullable', 'string', 'max:2048'],
+            'images' => ['nullable', 'array'],
+            'images.*' => [$this->filePondImageRule()],
+
             'sale_price' => ['required', 'numeric', 'min:0'],
             'stock_quantity' => ['required', 'integer', 'min:0'],
             'is_active' => ['nullable', 'boolean'],
@@ -59,9 +56,6 @@ class StoreProductRequest extends FormRequest
             'name.required' => 'Tên sản phẩm là bắt buộc.',
             'name.max' => 'Tên sản phẩm không được vượt quá 180 ký tự.',
 
-            'image_url.url' => 'Đường dẫn ảnh phải là URL hợp lệ.',
-            'image_url.max' => 'Đường dẫn ảnh không được vượt quá 2048 ký tự.',
-
             'sale_price.required' => 'Giá bán là bắt buộc.',
             'sale_price.numeric' => 'Giá bán phải là số.',
             'sale_price.min' => 'Giá bán không được âm.',
@@ -72,5 +66,25 @@ class StoreProductRequest extends FormRequest
 
             'is_active.boolean' => 'Trạng thái hoạt động không hợp lệ.',
         ];
+    }
+
+    private function filePondImageRule(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail): void {
+            if (is_string($value)) {
+                return;
+            }
+
+            if (! $value instanceof \Illuminate\Http\UploadedFile || ! $value->isValid()) {
+                $fail('Anh san pham khong hop le.');
+                return;
+            }
+
+            if (! in_array($value->getClientOriginalExtension(), ['jpg', 'jpeg', 'png', 'webp'], true)) {
+                $fail('Anh san pham phai co dinh dang jpg, jpeg, png hoac webp.');
+                return;
+            }
+
+        };
     }
 }

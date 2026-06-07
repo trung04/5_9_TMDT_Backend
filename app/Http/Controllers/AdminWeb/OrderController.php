@@ -10,6 +10,7 @@ use App\Models\Payment;
 use App\Models\ShippingCarrier;
 use App\Services\OrderService;
 use App\Services\OrderShipmentService;
+use App\Support\LocalGhnLocationCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -19,7 +20,8 @@ class OrderController extends AdminWebController
     public function __construct(
         \App\Support\AdminNavigation $navigation,
         private readonly OrderService $orderService,
-        private readonly OrderShipmentService $shipmentService
+        private readonly OrderShipmentService $shipmentService,
+        private readonly LocalGhnLocationCatalog $locationCatalog
     ) {
         parent::__construct($navigation);
     }
@@ -59,6 +61,7 @@ class OrderController extends AdminWebController
                 ? $this->orderService->allowedNextPaymentStatuses($orderModel->payment, $orderModel)
                 : [],
             'shippingCarriers' => ShippingCarrier::query()->available()->orderBy('name')->get(),
+            'provinces' => $this->locationCatalog->provinces(),
             'allStatuses' => Order::allowedStatuses(),
             'allPaymentStatuses' => Payment::allowedStatuses(),
         ]);

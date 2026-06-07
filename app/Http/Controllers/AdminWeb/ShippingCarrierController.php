@@ -4,13 +4,16 @@ namespace App\Http\Controllers\AdminWeb;
 
 use App\Http\Requests\Admin\ShippingCarrierRequest;
 use App\Models\ShippingCarrier;
+use App\Support\LocalGhnLocationCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class ShippingCarrierController extends AdminWebController
 {
-    public function __construct(\App\Support\AdminNavigation $navigation)
-    {
+    public function __construct(
+        \App\Support\AdminNavigation $navigation,
+        private readonly LocalGhnLocationCatalog $locationCatalog
+    ) {
         parent::__construct($navigation);
     }
 
@@ -35,6 +38,7 @@ class ShippingCarrierController extends AdminWebController
                 'default_required_note' => 'KHONGCHOXEMHANG',
                 'is_active' => true,
             ]),
+            'provinces' => $this->locationCatalog->provinces(),
         ]);
     }
 
@@ -56,6 +60,7 @@ class ShippingCarrierController extends AdminWebController
     {
         return $this->render('admin-web.shipping-carriers.edit', [
             'carrier' => $carrier,
+            'provinces' => $this->locationCatalog->provinces(),
         ]);
     }
 

@@ -17,6 +17,21 @@ class ProductController extends Controller
     use EnsuresAdminAccess;
     use PaginatesApiResults;
 
+    private const PRODUCT_PAYLOAD_KEYS = [
+        'category_id',
+        'supplier_id',
+        'region_id',
+        'sku',
+        'slug',
+        'name',
+        'description',
+        'image_url',
+        'sale_price',
+        'stock_quantity',
+        'is_active',
+        'is_deleted',
+    ];
+
     public function index(Request $request): JsonResponse
     {
         if ($response = $this->ensureAdmin($request, 'admin.products.view')) {
@@ -101,7 +116,7 @@ class ProductController extends Controller
             return $response;
         }
 
-        $data = $request->validated();
+        $data = $this->productPayload($request->validated());
         $data['is_active'] = $data['is_active'] ?? true;
         $data['is_deleted'] = $data['is_deleted'] ?? false;
 
@@ -127,7 +142,7 @@ class ProductController extends Controller
             ], 404);
         }
 
-        $data = $request->validated();
+        $data = $this->productPayload($request->validated());
 
         if (($data['is_active'] ?? false) === true && ! array_key_exists('is_deleted', $data)) {
             $data['is_deleted'] = false;
@@ -190,5 +205,22 @@ class ProductController extends Controller
             'message' => 'Product deleted successfully.',
             'data' => $product->refresh()->load(['category', 'supplier', 'region']),
         ], 200);
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    private function productPayload(array $attributes): array
+    {
+        $payload = [];
+
+        foreach (self::PRODUCT_PAYLOAD_KEYS as $key) {
+            if (array_key_exists($key, $attributes)) {
+                $payload[$key] = $attributes[$key];
+            }
+        }
+
+        return $payload;
     }
 }

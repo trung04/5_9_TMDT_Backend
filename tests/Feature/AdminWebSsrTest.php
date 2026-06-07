@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Category;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Payment;
 use App\Models\Post;
 use App\Models\Product;
@@ -12,6 +13,9 @@ use App\Models\Supplier;
 use App\Models\User;
 use Database\Seeders\AdminAccessSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AdminWebSsrTest extends TestCase
@@ -66,6 +70,60 @@ class AdminWebSsrTest extends TestCase
             ->assertSee('name="date_to" step="60" value="2026-06-04T18:15"', false)
             ->assertSee('01/06/2026 08:30')
             ->assertSee('04/06/2026 18:15');
+    }
+
+    public function test_dashboard_renders_visual_chart_containers(): void
+    {
+        $admin = $this->seededSuperAdmin();
+        $customer = User::factory()->create([
+            'full_name' => 'Chart Customer',
+        ]);
+        $category = Category::query()->create([
+            'name' => 'Chart Category',
+            'description' => 'Dashboard chart category',
+            'is_active' => true,
+            'is_deleted' => false,
+        ]);
+        $product = Product::query()->create([
+            'category_id' => $category->id,
+            'sku' => 'CHART-SSR-001',
+            'name' => 'Chart SSR Product',
+            'description' => 'Dashboard chart product',
+            'sale_price' => 125000,
+            'stock_quantity' => 15,
+            'is_active' => true,
+            'is_deleted' => false,
+        ]);
+        $order = $this->createLogisticsOrder($customer, [
+            'order_no' => 'ORD-CHART-SSR',
+            'status' => Order::STATUS_DELIVERED,
+            'subtotal' => 250000,
+            'shipping_fee' => 0,
+            'total_amount' => 250000,
+            'stock_deducted' => true,
+            'delivered_at' => now(),
+        ], [
+            'payment_status' => Payment::STATUS_SUCCESS,
+            'amount' => 250000,
+            'paid_at' => now(),
+        ]);
+        OrderItem::query()->create([
+            'order_id' => $order->id,
+            'product_id' => $product->id,
+            'product_name_snapshot' => $product->name,
+            'quantity' => 2,
+            'unit_price' => '125000.00',
+            'line_total' => '250000.00',
+        ]);
+
+        $this->actingAs($admin, 'web')
+            ->get('/admin-web')
+            ->assertOk()
+            ->assertSee('id="dashboard-revenue-chart"', false)
+            ->assertSee('id="dashboard-order-status-chart"', false)
+            ->assertSee('id="dashboard-top-products-chart"', false)
+            ->assertSee('data-dashboard-chart="revenue"', false)
+            ->assertSee('cdn.jsdelivr.net/npm/chart.js', false);
     }
 
     public function test_dashboard_work_queue_cards_link_for_all_active_admins(): void
@@ -218,6 +276,230 @@ class AdminWebSsrTest extends TestCase
         $this->assertStringContainsString('page=2', $response->getContent());
     }
 
+    public function test_admin_order_detail_shows_ghn_shipment_form_with_prefilled_address(): void
+    {
+        $admin = $this->seededSuperAdmin();
+        $carrier = $this->createGhnCarrier();
+        $customer = User::factory()->create([
+            'full_name' => 'GHN Form Customer',
+            'phone' => '0900000200',
+        ]);
+        $order = $this->createLogisticsOrder($customer, [
+            'order_no' => 'ORD-GHN-WEB-FORM',
+            'recipient_name' => 'Web Receiver',
+            'recipient_phone' => '0900000201',
+            'shipping_address' => '12 Nguyen Trai, Ben Nghe, Quan 1, Ho Chi Minh',
+            'shipping_line1' => '12 Nguyen Trai',
+            'shipping_province_id' => 202,
+            'shipping_province_name' => 'Ho Chi Minh',
+            'shipping_district_id' => 1442,
+            'shipping_district_name' => 'Quan 1',
+            'shipping_ward_code' => 'HCM-Q1-01',
+            'shipping_ward_name' => 'Ben Nghe',
+            'status' => Order::STATUS_CONFIRMED,
+            'stock_deducted' => true,
+        ]);
+
+        $this->actingAs($admin, 'web')
+            ->get("/admin-web/orders/{$order->id}")
+            ->assertOk()
+            ->assertSee('data-ghn-shipment-form', false)
+            ->assertSee('Tao van don GHN')
+            ->assertSee('name="recipient_name"', false)
+            ->assertSee('value="Web Receiver"', false)
+            ->assertSee('name="shipping_line1"', false)
+            ->assertSee('value="'.$carrier->id.'"', false);
+    }
+
+    public function test_admin_web_can_create_ghn_shipment_from_order_detail(): void
+    {
+        config()->set('services.ghn.token', 'test-token');
+        config()->set('services.ghn.shop_id', 123456);
+        config()->set('services.ghn.base_url', 'https://online-gateway.ghn.vn/shiip/public-api');
+
+        $admin = $this->seededSuperAdmin();
+        $carrier = $this->createGhnCarrier();
+        $customer = User::factory()->create([
+            'full_name' => 'GHN Create Customer',
+            'phone' => '0900000300',
+        ]);
+        $order = $this->createLogisticsOrder($customer, [
+            'order_no' => 'ORD-GHN-WEB-CREATE',
+            'recipient_name' => 'Web GHN Receiver',
+            'recipient_phone' => '0900000301',
+            'shipping_address' => '88 Le Loi, Hai Chau 1, Hai Chau, Da Nang',
+            'shipping_line1' => '88 Le Loi',
+            'shipping_province_id' => 203,
+            'shipping_province_name' => 'Da Nang',
+            'shipping_district_id' => 3001,
+            'shipping_district_name' => 'Hai Chau',
+            'shipping_ward_code' => 'DN-HC-01',
+            'shipping_ward_name' => 'Hai Chau 1',
+            'status' => Order::STATUS_CONFIRMED,
+            'shipping_fee' => 15000,
+            'total_amount' => 115000,
+            'stock_deducted' => true,
+        ]);
+
+        Http::fake([
+            'https://online-gateway.ghn.vn/shiip/public-api/v2/shipping-order/create' => Http::response([
+                'code' => 200,
+                'message' => 'Success',
+                'data' => [
+                    'order_code' => 'GHN-WEB-001',
+                    'total_fee' => 45000,
+                    'expected_delivery_time' => '2026-06-08T00:00:00Z',
+                ],
+            ]),
+        ]);
+
+        $response = $this->actingAs($admin, 'web')
+            ->post("/admin-web/orders/{$order->id}/shipment", [
+                'shipping_carrier_id' => $carrier->id,
+                'recipient_name' => 'Web GHN Receiver',
+                'recipient_phone' => '0900000301',
+                'shipping_line1' => '88 Le Loi',
+                'shipping_province_id' => 203,
+                'shipping_province_name' => 'Da Nang',
+                'shipping_district_id' => 3001,
+                'shipping_district_name' => 'Hai Chau',
+                'shipping_ward_code' => 'DN-HC-01',
+                'shipping_ward_name' => 'Hai Chau 1',
+                'service_type_id' => 2,
+                'payment_type_id' => 1,
+                'required_note' => 'KHONGCHOXEMHANG',
+                'weight' => 1200,
+                'length' => 25,
+                'width' => 20,
+                'height' => 12,
+                'note' => 'Create GHN from admin web.',
+            ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect(route('admin-web.orders.show', $order->id));
+
+        $order->refresh();
+        $this->assertSame(Order::STATUS_PACKED, $order->status);
+        $this->assertSame('GHN-WEB-001', $order->shipping_code);
+        $this->assertSame('15000.00', $order->shipping_fee);
+        $this->assertDatabaseHas('order_shipments', [
+            'order_id' => $order->id,
+            'tracking_code' => 'GHN-WEB-001',
+            'shipping_fee' => '45000.00',
+            'cod_amount' => '115000.00',
+        ]);
+
+        Http::assertSent(fn ($request): bool => $request['to_ward_code'] === 'DN-HC-01'
+            && $request['to_district_id'] === 3001
+            && $request['return_ward_code'] === 'HN-CG-01'
+            && $request['return_district_id'] === 1454);
+    }
+
+    public function test_admin_web_can_sync_ghn_shipment_status(): void
+    {
+        config()->set('services.ghn.token', 'test-token');
+        config()->set('services.ghn.shop_id', 123456);
+        config()->set('services.ghn.base_url', 'https://online-gateway.ghn.vn/shiip/public-api');
+
+        $admin = $this->seededSuperAdmin();
+        $carrier = $this->createGhnCarrier();
+        $customer = User::factory()->create([
+            'full_name' => 'GHN Sync Customer',
+        ]);
+        $order = $this->createLogisticsOrder($customer, [
+            'order_no' => 'ORD-GHN-WEB-SYNC',
+            'status' => Order::STATUS_PACKED,
+            'stock_deducted' => true,
+            'shipping_code' => 'GHN-WEB-SYNC',
+        ]);
+        $order->shipment()->create([
+            'shipping_carrier_id' => $carrier->id,
+            'provider' => ShippingCarrier::PROVIDER_GHN,
+            'status' => 'ready_to_pick',
+            'tracking_code' => 'GHN-WEB-SYNC',
+            'tracking_url' => 'https://donhang.ghn.vn/?order_code=GHN-WEB-SYNC',
+            'service_type_id' => 2,
+            'payment_type_id' => 1,
+            'required_note' => 'KHONGCHOXEMHANG',
+            'weight' => 1000,
+            'length' => 20,
+            'width' => 20,
+            'height' => 10,
+            'shipping_fee' => '33000.00',
+            'cod_amount' => '115000.00',
+            'created_by_user_id' => $admin->id,
+            'updated_by_user_id' => $admin->id,
+        ]);
+
+        Http::fake([
+            'https://online-gateway.ghn.vn/shiip/public-api/v2/shipping-order/detail-by-client-code' => Http::response([
+                'code' => 200,
+                'message' => 'Success',
+                'data' => [
+                    'order_code' => 'GHN-WEB-SYNC',
+                    'status' => 'delivered',
+                ],
+            ]),
+        ]);
+
+        $response = $this->actingAs($admin, 'web')
+            ->post("/admin-web/orders/{$order->id}/shipment/sync");
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect(route('admin-web.orders.show', $order->id));
+        $this->assertSame(Order::STATUS_DELIVERED, $order->refresh()->status);
+        $this->assertDatabaseHas('order_shipments', [
+            'order_id' => $order->id,
+            'status' => 'delivered',
+        ]);
+    }
+
+    public function test_admin_web_can_save_ghn_carrier_defaults_and_pickup_address(): void
+    {
+        $admin = $this->seededSuperAdmin();
+
+        $response = $this->actingAs($admin, 'web')
+            ->post('/admin-web/shipping-carriers', [
+                'code' => 'GHN-WEB',
+                'name' => 'GHN Web',
+                'provider' => ShippingCarrier::PROVIDER_GHN,
+                'tracking_url_template' => 'https://donhang.ghn.vn/?order_code={code}',
+                'default_weight' => 1400,
+                'default_length' => 30,
+                'default_width' => 22,
+                'default_height' => 12,
+                'default_service_type_id' => 5,
+                'default_payment_type_id' => 2,
+                'default_required_note' => 'CHOXEMHANGKHONGTHU',
+                'pickup_name' => 'Kho GHN Web',
+                'pickup_phone' => '0900000999',
+                'pickup_address' => '123 Cau Giay',
+                'pickup_province_id' => 201,
+                'pickup_province_name' => 'Ha Noi',
+                'pickup_district_id' => 1454,
+                'pickup_district_name' => 'Cau Giay',
+                'pickup_ward_code' => 'HN-CG-01',
+                'pickup_ward_name' => 'Dich Vong Hau',
+                'is_active' => 1,
+                'is_deleted' => 0,
+            ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('shipping_carriers', [
+            'code' => 'GHN-WEB',
+            'provider' => ShippingCarrier::PROVIDER_GHN,
+            'default_weight' => 1400,
+            'default_length' => 30,
+            'default_width' => 22,
+            'default_height' => 12,
+            'default_service_type_id' => 5,
+            'default_payment_type_id' => 2,
+            'default_required_note' => 'CHOXEMHANGKHONGTHU',
+            'pickup_ward_code' => 'HN-CG-01',
+            'pickup_district_id' => 1454,
+        ]);
+    }
+
     public function test_catalog_pages_render_index_create_and_edit_separately(): void
     {
         $admin = $this->seededSuperAdmin();
@@ -247,8 +529,14 @@ class AdminWebSsrTest extends TestCase
         ]);
 
         $this->actingAs($admin, 'web')->get('/admin-web/products')->assertOk()->assertDontSee('name="sku"', false);
-        $this->actingAs($admin, 'web')->get('/admin-web/products/create')->assertOk()->assertSee('Tạo sản phẩm')->assertSee('name="sku"', false);
-        $this->actingAs($admin, 'web')->get("/admin-web/products/{$product->id}/edit")->assertOk()->assertSee('Sửa sản phẩm')->assertSee('SSR Product');
+
+        $productCreateResponse = $this->actingAs($admin, 'web')->get('/admin-web/products/create');
+        $productCreateResponse->assertOk()->assertSee('Tạo sản phẩm')->assertSee('name="sku"', false);
+        $this->assertProductAdminFormHidesRemovedFields($productCreateResponse);
+
+        $productEditResponse = $this->actingAs($admin, 'web')->get("/admin-web/products/{$product->id}/edit");
+        $productEditResponse->assertOk()->assertSee('Sửa sản phẩm')->assertSee('SSR Product');
+        $this->assertProductAdminFormHidesRemovedFields($productEditResponse);
 
         $this->actingAs($admin, 'web')->get('/admin-web/categories')->assertOk()->assertDontSee('name="description"', false);
         $this->actingAs($admin, 'web')->get('/admin-web/categories/create')->assertOk()->assertSee('Tạo danh mục')->assertSee('name="description"', false);
@@ -257,6 +545,155 @@ class AdminWebSsrTest extends TestCase
         $this->actingAs($admin, 'web')->get('/admin-web/suppliers')->assertOk()->assertDontSee('name="supplier_code"', false);
         $this->actingAs($admin, 'web')->get('/admin-web/suppliers/create')->assertOk()->assertSee('Tạo nhà cung cấp')->assertSee('name="supplier_code"', false);
         $this->actingAs($admin, 'web')->get("/admin-web/suppliers/{$supplier->id}/edit")->assertOk()->assertSee('Sửa nhà cung cấp')->assertSee('SSR Supplier');
+    }
+
+    public function test_admin_can_create_product_with_multiple_uploaded_images(): void
+    {
+        Storage::fake('public');
+
+        $admin = $this->seededSuperAdmin();
+        $category = Category::query()->create([
+            'name' => 'Upload Category',
+            'description' => 'Catalog bucket',
+            'is_active' => true,
+            'is_deleted' => false,
+        ]);
+
+        $response = $this->actingAs($admin, 'web')
+            ->post('/admin-web/products', [
+                'category_id' => $category->id,
+                'sku' => 'UPLOAD-001',
+                'name' => 'Uploaded Product',
+                'description' => 'Product with uploaded images',
+                'sale_price' => 150000,
+                'stock_quantity' => 12,
+                'is_active' => 1,
+                'is_deleted' => 0,
+                'image_url' => $this->fakeUploadedImage('thumbnail.png'),
+                'images' => [
+                    $this->fakeUploadedImage('front.png'),
+                    $this->fakeUploadedImage('detail.png'),
+                ],
+            ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect(route('admin-web.products.index'));
+
+        $product = Product::query()->where('sku', 'UPLOAD-001')->firstOrFail();
+
+        $galleryPaths = explode('|', (string) $product->gallery);
+        $this->assertCount(2, $galleryPaths);
+        $this->assertStringStartsWith('products/', (string) $product->image_url);
+
+        Storage::disk('public')->assertExists((string) $product->image_url);
+
+        foreach ($galleryPaths as $path) {
+            $this->assertStringStartsWith('products/', $path);
+            Storage::disk('public')->assertExists($path);
+        }
+    }
+
+    public function test_admin_product_edit_appends_uploaded_images(): void
+    {
+        Storage::fake('public');
+
+        $admin = $this->seededSuperAdmin();
+        $category = Category::query()->create([
+            'name' => 'Append Category',
+            'description' => 'Catalog bucket',
+            'is_active' => true,
+            'is_deleted' => false,
+        ]);
+        $product = Product::query()->create([
+            'category_id' => $category->id,
+            'sku' => 'APPEND-001',
+            'name' => 'Append Product',
+            'description' => 'Existing product',
+            'sale_price' => 150000,
+            'stock_quantity' => 12,
+            'is_active' => true,
+            'is_deleted' => false,
+        ]);
+        $existing = $this->createStoredGalleryImage($product, 'existing.jpg');
+        $product->update([
+            'image_url' => $existing,
+            'gallery' => $existing,
+        ]);
+
+        $this->actingAs($admin, 'web')
+            ->post("/admin-web/products/{$product->id}", [
+                '_method' => 'PUT',
+                'category_id' => $category->id,
+                'sku' => 'APPEND-001',
+                'name' => 'Append Product',
+                'description' => 'Existing product',
+                'sale_price' => 150000,
+                'stock_quantity' => 12,
+                'is_active' => 1,
+                'is_deleted' => 0,
+                'existing_gallery' => [$existing],
+                'images' => [
+                    $this->fakeUploadedImage('new.png'),
+                ],
+            ])
+            ->assertRedirect(route('admin-web.products.edit', $product->id));
+
+        $product->refresh();
+        $galleryPaths = explode('|', (string) $product->gallery);
+        $this->assertCount(2, $galleryPaths);
+        $this->assertSame($existing, $galleryPaths[0]);
+        $this->assertStringStartsWith('products/', $galleryPaths[1]);
+        $this->assertSame($existing, $product->image_url);
+        Storage::disk('public')->assertExists($galleryPaths[1]);
+    }
+
+    public function test_admin_product_edit_can_remove_existing_gallery_images(): void
+    {
+        Storage::fake('public');
+
+        $admin = $this->seededSuperAdmin();
+        $category = Category::query()->create([
+            'name' => 'Primary Category',
+            'description' => 'Catalog bucket',
+            'is_active' => true,
+            'is_deleted' => false,
+        ]);
+        $product = Product::query()->create([
+            'category_id' => $category->id,
+            'sku' => 'PRIMARY-001',
+            'name' => 'Primary Product',
+            'description' => 'Existing product',
+            'sale_price' => 150000,
+            'stock_quantity' => 12,
+            'is_active' => true,
+            'is_deleted' => false,
+        ]);
+        $removed = $this->createStoredGalleryImage($product, 'removed.jpg');
+        $kept = $this->createStoredGalleryImage($product, 'kept.jpg');
+        $product->update([
+            'image_url' => $removed,
+            'gallery' => $removed.'|'.$kept,
+        ]);
+
+        $this->actingAs($admin, 'web')
+            ->post("/admin-web/products/{$product->id}", [
+                '_method' => 'PUT',
+                'category_id' => $category->id,
+                'sku' => 'PRIMARY-001',
+                'name' => 'Primary Product',
+                'description' => 'Existing product',
+                'sale_price' => 150000,
+                'stock_quantity' => 12,
+                'is_active' => 1,
+                'is_deleted' => 0,
+                'existing_gallery' => [$kept],
+            ])
+            ->assertRedirect(route('admin-web.products.edit', $product->id));
+
+        $this->assertSame($kept, $product->refresh()->gallery);
+        $this->assertSame($removed, $product->image_url);
+        Storage::disk('public')->assertExists($removed);
+        Storage::disk('public')->assertExists($kept);
     }
 
     public function test_user_and_shipping_carrier_pages_render_create_and_edit_separately(): void
@@ -405,6 +842,34 @@ class AdminWebSsrTest extends TestCase
         ]);
     }
 
+    private function createGhnCarrier(array $attributes = []): ShippingCarrier
+    {
+        return ShippingCarrier::query()->create([
+            'code' => $attributes['code'] ?? 'GHN',
+            'name' => $attributes['name'] ?? 'Giao Hang Nhanh',
+            'provider' => ShippingCarrier::PROVIDER_GHN,
+            'tracking_url_template' => $attributes['tracking_url_template'] ?? 'https://donhang.ghn.vn/?order_code={code}',
+            'default_weight' => $attributes['default_weight'] ?? 1000,
+            'default_length' => $attributes['default_length'] ?? 20,
+            'default_width' => $attributes['default_width'] ?? 20,
+            'default_height' => $attributes['default_height'] ?? 10,
+            'default_service_type_id' => $attributes['default_service_type_id'] ?? 2,
+            'default_payment_type_id' => $attributes['default_payment_type_id'] ?? 1,
+            'default_required_note' => $attributes['default_required_note'] ?? 'KHONGCHOXEMHANG',
+            'pickup_name' => $attributes['pickup_name'] ?? 'Kho GHN',
+            'pickup_phone' => $attributes['pickup_phone'] ?? '0900000999',
+            'pickup_address' => $attributes['pickup_address'] ?? '123 Cau Giay',
+            'pickup_ward_code' => $attributes['pickup_ward_code'] ?? 'HN-CG-01',
+            'pickup_ward_name' => $attributes['pickup_ward_name'] ?? 'Dich Vong Hau',
+            'pickup_district_id' => $attributes['pickup_district_id'] ?? 1454,
+            'pickup_district_name' => $attributes['pickup_district_name'] ?? 'Cau Giay',
+            'pickup_province_id' => $attributes['pickup_province_id'] ?? 201,
+            'pickup_province_name' => $attributes['pickup_province_name'] ?? 'Ha Noi',
+            'is_active' => $attributes['is_active'] ?? true,
+            'is_deleted' => $attributes['is_deleted'] ?? false,
+        ]);
+    }
+
     private function assertCustomerAdminFormHidesRemovedFields(\Illuminate\Testing\TestResponse $response): void
     {
         foreach ([
@@ -420,6 +885,39 @@ class AdminWebSsrTest extends TestCase
         }
     }
 
+    private function assertProductAdminFormHidesRemovedFields(\Illuminate\Testing\TestResponse $response): void
+    {
+        foreach ([
+            'short_description',
+            'origin',
+            'weight',
+            'shelf_life',
+            'certifications[]',
+            'gallery[]',
+        ] as $field) {
+            $response->assertDontSee("name=\"{$field}\"", false);
+        }
+    }
+
+    private function createStoredGalleryImage(Product $product, string $fileName): string
+    {
+        $path = "products/{$product->id}/{$fileName}";
+        Storage::disk('public')->put($path, 'test-image');
+
+        return $path;
+    }
+
+    private function fakeUploadedImage(string $fileName): UploadedFile
+    {
+        $png = base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII='
+        );
+
+        return UploadedFile::fake()
+            ->createWithContent($fileName, $png)
+            ->mimeType('image/png');
+    }
+
     /**
      * @param  array<string, mixed>  $orderAttributes
      * @param  array<string, mixed>  $paymentAttributes
@@ -432,6 +930,13 @@ class AdminWebSsrTest extends TestCase
             'recipient_name' => $orderAttributes['recipient_name'] ?? $customer->full_name,
             'recipient_phone' => $orderAttributes['recipient_phone'] ?? $customer->phone,
             'shipping_address' => $orderAttributes['shipping_address'] ?? '12 Test Street',
+            'shipping_line1' => $orderAttributes['shipping_line1'] ?? null,
+            'shipping_province_id' => $orderAttributes['shipping_province_id'] ?? null,
+            'shipping_province_name' => $orderAttributes['shipping_province_name'] ?? null,
+            'shipping_district_id' => $orderAttributes['shipping_district_id'] ?? null,
+            'shipping_district_name' => $orderAttributes['shipping_district_name'] ?? null,
+            'shipping_ward_code' => $orderAttributes['shipping_ward_code'] ?? null,
+            'shipping_ward_name' => $orderAttributes['shipping_ward_name'] ?? null,
             'payment_method' => $orderAttributes['payment_method'] ?? Order::PAYMENT_METHOD_COD,
             'status' => $orderAttributes['status'] ?? Order::STATUS_PENDING,
             'subtotal' => $orderAttributes['subtotal'] ?? 100000,
@@ -439,6 +944,8 @@ class AdminWebSsrTest extends TestCase
             'discount_amount' => $orderAttributes['discount_amount'] ?? 0,
             'total_amount' => $orderAttributes['total_amount'] ?? 115000,
             'stock_deducted' => $orderAttributes['stock_deducted'] ?? false,
+            'shipping_code' => $orderAttributes['shipping_code'] ?? null,
+            'delivered_at' => $orderAttributes['delivered_at'] ?? null,
         ]);
 
         Payment::query()->create([

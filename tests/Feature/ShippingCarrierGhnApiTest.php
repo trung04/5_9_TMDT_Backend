@@ -122,6 +122,10 @@ class ShippingCarrierGhnApiTest extends TestCase
         $this->seed(ShippingCarrierSeeder::class);
         $order = $this->createOrder(status: Order::STATUS_CONFIRMED);
         $carrier = ShippingCarrier::query()->where('code', 'GHN')->firstOrFail();
+        $carrier->update([
+            'pickup_ward_code' => 'HN-CG-01',
+            'pickup_district_id' => 1454,
+        ]);
 
         Http::fake([
             'https://online-gateway.ghn.vn/shiip/public-api/v2/shipping-order/create' => Http::response([
@@ -154,6 +158,17 @@ class ShippingCarrierGhnApiTest extends TestCase
             'tracking_code' => 'GHN123456',
             'shipping_fee' => '33000.00',
         ]);
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'shipping_fee' => '20000.00',
+            'shipping_code' => 'GHN123456',
+        ]);
+
+        Http::assertSent(fn ($request): bool => $request['to_ward_code'] === '20101'
+            && $request['to_district_id'] === 1442
+            && $request['return_ward_code'] === 'HN-CG-01'
+            && $request['return_district_id'] === 1454);
     }
 
     public function test_create_ghn_shipment_falls_back_to_customer_default_address(): void

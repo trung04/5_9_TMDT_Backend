@@ -8,11 +8,49 @@ use App\Models\Supplier;
 use App\Models\User;
 use Database\Seeders\AdminAccessSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class AdminCatalogApiTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_product_table_keeps_gallery_as_string_column(): void
+    {
+        foreach (['short_description', 'origin', 'weight', 'shelf_life', 'certifications'] as $column) {
+            $this->assertFalse(Schema::hasColumn('products', $column));
+        }
+
+        $this->assertTrue(Schema::hasColumn('products', 'gallery'));
+        $this->assertSame('text', Schema::getColumnType('products', 'gallery'));
+
+        foreach (['product_id', 'image_url', 'path', 'sort_order', 'is_primary'] as $column) {
+            $this->assertTrue(Schema::hasColumn('product_images', $column));
+        }
+    }
+
+    public function test_product_gallery_accepts_pipe_separated_string(): void
+    {
+        $category = Category::query()->create([
+            'name' => 'Gallery Category',
+            'description' => 'Gallery test category',
+            'is_active' => true,
+        ]);
+
+        $product = Product::query()->create([
+            'category_id' => $category->id,
+            'sku' => 'GALLERY-STRING-001',
+            'name' => 'Gallery String Product',
+            'description' => 'Product with a pipe-separated gallery string.',
+            'sale_price' => 100000,
+            'stock_quantity' => 5,
+            'is_active' => true,
+            'is_deleted' => false,
+            'gallery' => 'products/front.jpg|products/detail.jpg',
+        ]);
+
+        $this->assertSame('products/front.jpg|products/detail.jpg', $product->refresh()->gallery);
+    }
 
     public function test_admin_category_and_supplier_lists_include_inactive_records(): void
     {

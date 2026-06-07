@@ -6,6 +6,7 @@ use App\Models\Concerns\HasActiveState;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Product extends Model
 {
@@ -24,17 +25,12 @@ class Product extends Model
         'slug',
         'name',
         'description',
-        'short_description',
         'image_url',
-        'origin',
-        'weight',
-        'shelf_life',
-        'certifications',
-        'gallery',
         'sale_price',
         'stock_quantity',
         'is_active',
         'is_deleted',
+        'gallery',
     ];
 
     /**
@@ -47,8 +43,6 @@ class Product extends Model
         return [
             'sale_price' => 'decimal:2',
             'stock_quantity' => 'integer',
-            'certifications' => 'array',
-            'gallery' => 'array',
             'is_active' => 'boolean',
             'is_deleted' => 'boolean',
             'created_at' => 'datetime',
@@ -94,5 +88,35 @@ class Product extends Model
     public function orderItems(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function galleryImageUrls(): array
+    {
+        return collect(explode('|', (string) $this->gallery))
+            ->map(fn (string $path): string => trim($path))
+            ->filter()
+            ->map(fn (string $path): string => $this->displayImageUrl($path))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function displayImageUrl(?string $path = null): ?string
+    {
+        $path = trim((string) ($path ?? $this->image_url));
+
+        if ($path === '') {
+            return null;
+        }
+
+        if (Str::startsWith($path, ['http://', 'https://', '/'])) {
+            return $path;
+        }
+
+        return asset('storage/'.$path);
     }
 }

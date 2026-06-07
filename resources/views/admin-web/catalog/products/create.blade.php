@@ -6,7 +6,6 @@
     <div class="toolbar">
         <div>
             <h2>Tạo sản phẩm</h2>
-            <p>Dùng trang biểu mẫu riêng để thêm sản phẩm mới.</p>
         </div>
     </div>
 

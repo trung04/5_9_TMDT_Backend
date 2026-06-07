@@ -27,20 +27,17 @@ class StorefrontController extends Controller
 
     public function home(): View
     {
-        if (! Schema::hasTable('products')) {
+        if (!Schema::hasTable('products')) {
             return view('user-web.storefront.home', [
                 'featuredProducts' => collect(),
                 'categories' => collect(),
                 'regions' => collect(),
-                'posts' => collect(),
             ]);
         }
-
         return view('user-web.storefront.home', [
-            'featuredProducts' => $this->baseProductQuery()->take(6)->get(),
-            'categories' => Schema::hasTable('categories') ? Category::query()->available()->orderBy('name')->take(6)->get() : collect(),
-            'regions' => Schema::hasTable('regions') ? Region::query()->where('is_active', true)->withCount(['products' => fn ($query) => $query->available()])->orderBy('id')->take(6)->get() : collect(),
-            'posts' => Schema::hasTable('posts') ? Post::query()->published()->with('author')->orderByDesc('published_at')->take(3)->get() : collect(),
+            'featuredProducts' => Product::take(6)->get(),
+            'categories' => Category::orderBy('name')->take(6)->get(),
+            'regions' => Region::orderBy('id')->where('is_active', 1)->take(6)->get(),
         ]);
     }
 
@@ -57,7 +54,7 @@ class StorefrontController extends Controller
             ? (string) $request->query('view')
             : (string) $request->session()->get('user_web.catalog_view', 'grid');
 
-        if (! in_array($view, ['grid', 'list'], true)) {
+        if (!in_array($view, ['grid', 'list'], true)) {
             $view = 'grid';
         }
 
@@ -98,7 +95,7 @@ class StorefrontController extends Controller
         $products = $query->paginate(15)->withQueryString();
 
         if ($ratingMin > 0) {
-            $products->setCollection($products->getCollection()->filter(fn () => 4.8 >= $ratingMin)->values());
+            $products->setCollection($products->getCollection()->filter(fn() => 4.8 >= $ratingMin)->values());
         }
 
         return view('user-web.storefront.catalog', [
@@ -114,18 +111,16 @@ class StorefrontController extends Controller
     public function product(string $slug): View
     {
         $product = $this->resolveProduct($slug);
-
-        abort_unless($product, 404);
-
+        if (!$product) {
+            abort(404);
+        }
         $relatedProducts = $this->baseProductQuery()
-            ->whereKeyNot($product->id)
-            ->where(function ($query) use ($product): void {
+            ->whereKeyNot($product->id)->where(function ($query) use ($product): void {
                 $query->where('category_id', $product->category_id)
                     ->orWhere('supplier_id', $product->supplier_id);
             })
             ->take(4)
             ->get();
-
         return view('user-web.storefront.product-detail', [
             'product' => $product,
             'relatedProducts' => $relatedProducts,
@@ -202,7 +197,7 @@ class StorefrontController extends Controller
         return view('user-web.storefront.regions', [
             'regions' => Region::query()
                 ->where('is_active', true)
-                ->withCount(['products' => fn ($query) => $query->available()])
+                ->withCount(['products' => fn($query) => $query->available()])
                 ->orderBy('id')
                 ->get(),
             'productsByRegion' => Product::query()
@@ -264,20 +259,20 @@ class StorefrontController extends Controller
     {
         if (is_array($value)) {
             return collect($value)
-                ->map(fn (mixed $item): int => (int) $item)
-                ->filter(fn (int $item): bool => $item > 0)
+                ->map(fn(mixed $item): int => (int) $item)
+                ->filter(fn(int $item): bool => $item > 0)
                 ->unique()
                 ->values()
                 ->all();
         }
 
-        if (! is_string($value) || trim($value) === '') {
+        if (!is_string($value) || trim($value) === '') {
             return [];
         }
 
         return collect(explode(',', $value))
-            ->map(fn (string $item): int => (int) trim($item))
-            ->filter(fn (int $item): bool => $item > 0)
+            ->map(fn(string $item): int => (int) trim($item))
+            ->filter(fn(int $item): bool => $item > 0)
             ->unique()
             ->values()
             ->all();
@@ -288,7 +283,7 @@ class StorefrontController extends Controller
         /** @var User|null $user */
         $user = Auth::guard('web')->user();
 
-        if (! $user || $user->role !== User::ROLE_CUSTOMER || ! $user->canAuthenticate()) {
+        if (!$user || $user->role !== User::ROLE_CUSTOMER || !$user->canAuthenticate()) {
             abort(403);
         }
     }

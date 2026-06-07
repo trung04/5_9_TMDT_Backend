@@ -49,7 +49,7 @@ class ShippingCarrierRequest extends FormRequest
             'default_length' => ['nullable', 'integer', 'min:1', 'max:200'],
             'default_width' => ['nullable', 'integer', 'min:1', 'max:200'],
             'default_height' => ['nullable', 'integer', 'min:1', 'max:200'],
-            'default_service_type_id' => ['nullable', 'integer', Rule::in([2, 5])],
+            'default_service_type_id' => ['nullable', 'integer', Rule::in([1, 2, 5])],
             'default_payment_type_id' => ['nullable', 'integer', Rule::in([1, 2])],
             'default_required_note' => ['nullable', 'string', Rule::in(['CHOTHUHANG', 'CHOXEMHANGKHONGTHU', 'KHONGCHOXEMHANG'])],
             'pickup_name' => ['nullable', 'string', 'max:120'],

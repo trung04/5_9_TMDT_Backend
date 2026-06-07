@@ -64,6 +64,18 @@ class AdminInsightService
         $pendingOrdersCount = Order::query()->where('status', Order::STATUS_PENDING)->count();
         $shippingOrdersCount = Order::query()->where('status', Order::STATUS_SHIPPED)->count();
         $deliveryFailedOrdersCount = Order::query()->where('status', Order::STATUS_DELIVERY_FAILED)->count();
+        $orderStatusCounts = Order::query()
+            ->select('status')
+            ->selectRaw('COUNT(*) as orders_count')
+            ->groupBy('status')
+            ->pluck('orders_count', 'status');
+        $orderStatusChart = collect(Order::allowedStatuses())
+            ->map(fn (string $status): array => [
+                'status' => $status,
+                'label' => $this->orderStatusLabel($status),
+                'count' => (int) ($orderStatusCounts[$status] ?? 0),
+            ])
+            ->all();
 
         $bankTransferPendingBase = Order::query()
             ->where('payment_method', Order::PAYMENT_METHOD_BANK_TRANSFER)
@@ -281,6 +293,7 @@ class AdminInsightService
             'low_stock_products' => $lowStockProducts,
             'top_customers' => $topCustomers,
             'revenue_chart' => $revenueChart,
+            'order_status_chart' => $orderStatusChart,
         ];
     }
 
@@ -507,6 +520,20 @@ class AdminInsightService
             'this_month' => 'Tháng này',
             'custom' => 'Tùy chỉnh',
             default => '30 ngày gần nhất',
+        };
+    }
+
+    private function orderStatusLabel(string $status): string
+    {
+        return match ($status) {
+            Order::STATUS_PENDING => 'Cho xac nhan',
+            Order::STATUS_CONFIRMED => 'Da xac nhan',
+            Order::STATUS_PACKED => 'Da dong goi',
+            Order::STATUS_SHIPPED => 'Dang giao',
+            Order::STATUS_DELIVERED => 'Da giao',
+            Order::STATUS_DELIVERY_FAILED => 'Giao that bai',
+            Order::STATUS_CANCELLED => 'Da huy',
+            default => $status,
         };
     }
 }

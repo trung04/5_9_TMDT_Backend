@@ -37,16 +37,15 @@ class UpdateProductRequest extends FormRequest
             ],
             'name' => ['required', 'string', 'max:180'],
             'description' => ['nullable', 'string'],
-            'short_description' => ['nullable', 'string'],
-            'image_url' => ['nullable', 'url', 'max:2048'],
-            'origin' => ['nullable', 'string', 'max:180'],
-            'weight' => ['nullable', 'string', 'max:80'],
-            'shelf_life' => ['nullable', 'string', 'max:120'],
-            'certifications' => ['nullable', 'array'],
-            'certifications.*' => ['string', 'max:120'],
-            'gallery' => ['nullable', 'array'],
+            'image_url' => $this->hasFile('image_url')
+                ? ['nullable', 'image', 'mimes:jpg,jpeg,png,webp']
+                : ['nullable', 'string', 'max:2048'],
             'sale_price' => ['required', 'numeric', 'min:0'],
             'stock_quantity' => ['required', 'integer', 'min:0'],
+            'existing_gallery' => ['nullable', 'array'],
+            'existing_gallery.*' => ['string', 'max:2048'],
+            'images' => ['nullable', 'array'],
+            'images.*' => [$this->filePondImageRule()],
             'is_active' => ['nullable', 'boolean'],
             'is_deleted' => ['nullable', 'boolean'],
         ];
@@ -85,5 +84,25 @@ class UpdateProductRequest extends FormRequest
 
             'is_active.boolean' => 'Trạng thái hoạt động không hợp lệ.',
         ];
+    }
+
+    private function filePondImageRule(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail): void {
+            if (is_string($value)) {
+                return;
+            }
+
+            if (! $value instanceof \Illuminate\Http\UploadedFile || ! $value->isValid()) {
+                $fail('Anh san pham khong hop le.');
+                return;
+            }
+
+            if (! in_array($value->getClientOriginalExtension(), ['jpg', 'jpeg', 'png', 'webp'], true)) {
+                $fail('Anh san pham phai co dinh dang jpg, jpeg, png hoac webp.');
+                return;
+            }
+
+        };
     }
 }

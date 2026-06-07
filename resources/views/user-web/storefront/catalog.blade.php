@@ -157,14 +157,14 @@
                 </div>
             @else
                 <div class="space-y-6">
-                    @foreach($products as $product)
+                        @foreach($products as $product)
                         @php
-                            $image = trim((string) $product->image_url);
+                            $image = $product->displayImageUrl() ?? collect($product->galleryImageUrls())->first();
                             $isAvailable = $product->is_active && ! $product->is_deleted && $product->stock_quantity > 0;
                         @endphp
                         <article class="flex flex-col gap-6 rounded-xl bg-surface-container-lowest p-5 md:flex-row">
                             <a class="md:w-56" href="{{ $ui->productUrl($product) }}">
-                                @if($image !== '')
+                                @if($image)
                                     <img class="aspect-[4/5] w-full rounded-xl object-cover" src="{{ $image }}" alt="{{ $product->name }}">
                                 @else
                                     <div class="flex aspect-[4/5] w-full items-center justify-center rounded-xl bg-surface-container-low text-primary">
@@ -179,7 +179,7 @@
                                         <span class="text-sm text-on-surface-variant">{{ $product->category?->name ?? $product->supplier?->name }}</span>
                                     </div>
                                     <a class="font-headline text-2xl font-semibold" href="{{ $ui->productUrl($product) }}">{{ $product->name }}</a>
-                                    <p class="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant">{{ $product->description ?: $product->short_description }}</p>
+                                    <p class="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant">{{ $product->description }}</p>
                                 </div>
                                 <div class="flex flex-wrap items-center justify-between gap-4">
                                     <div class="flex items-center gap-4">

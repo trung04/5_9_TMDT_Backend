@@ -5,26 +5,14 @@
 
 @section('content')
 @php
-    $gallery = collect($product->gallery ?? [])
-        ->map(function ($item) {
-            if (is_array($item)) {
-                return $item['src'] ?? $item['url'] ?? $item['image_url'] ?? null;
-            }
-
-            return is_string($item) ? $item : null;
-        })
-        ->filter()
-        ->prepend($product->image_url)
-        ->filter()
-        ->unique()
-        ->values();
-    $gallery = $gallery->isNotEmpty() ? $gallery : collect([null]);
+    $gallery = collect([$product->displayImageUrl()])
+        ->merge($product->galleryImageUrls());
+    $gallery = $gallery->filter()->unique()->values();
     $activeMedia = $gallery->first();
     $stock = (int) $product->stock_quantity;
     $isOutOfStock = $stock <= 0;
     $maxQuantity = max(1, $stock);
     $lowStockLabel = $stock > 0 && $stock <= 5 ? "Chỉ còn {$stock} sản phẩm" : null;
-    $certifications = collect($product->certifications ?? [])->filter()->values();
 @endphp
 
 <section class="mx-auto max-w-screen-2xl px-6 pb-16 pt-24">
@@ -48,14 +36,12 @@
                 @endif
             </div>
 
-            @if($gallery->filter()->count() > 1)
+            @if($gallery->count() > 1)
                 <div class="grid grid-cols-4 gap-4">
                     @foreach($gallery as $index => $media)
-                        @if($media)
-                            <button class="aspect-square overflow-hidden rounded-xl transition-opacity {{ $index === 0 ? 'border-2 border-primary' : 'opacity-70 hover:opacity-100' }}" type="button" data-gallery-thumb data-gallery-main="#product-gallery-main" data-gallery-src="{{ $media }}" data-gallery-alt="Ảnh {{ $index + 1 }} của {{ $product->name }}" aria-label="Xem ảnh {{ $index + 1 }} của {{ $product->name }}">
-                                <img class="h-full w-full object-cover" src="{{ $media }}" alt="Ảnh {{ $index + 1 }} của {{ $product->name }}">
-                            </button>
-                        @endif
+                        <button class="aspect-square overflow-hidden rounded-xl transition-opacity {{ $index === 0 ? 'border-2 border-primary' : 'opacity-70 hover:opacity-100' }}" type="button" data-gallery-thumb data-gallery-main="#product-gallery-main" data-gallery-src="{{ $media }}" data-gallery-alt="Ảnh {{ $index + 1 }} của {{ $product->name }}" aria-label="Xem ảnh {{ $index + 1 }} của {{ $product->name }}">
+                            <img class="h-full w-full object-cover" src="{{ $media }}" alt="Ảnh {{ $index + 1 }} của {{ $product->name }}">
+                        </button>
                     @endforeach
                 </div>
             @endif
@@ -105,8 +91,8 @@
                     <span class="font-medium">{{ $ui->stockLabel($product) }}</span>
                 </div>
                 <div class="flex flex-col gap-1">
-                    <span class="text-xs uppercase tracking-wider text-on-surface-variant">Mô tả nhanh</span>
-                    <span class="font-medium">{{ $product->short_description ?: ($product->origin ?: 'Đặc sản địa phương') }}</span>
+                    <span class="text-xs uppercase tracking-wider text-on-surface-variant">Danh mục</span>
+                    <span class="font-medium">{{ $product->category?->name ?? $product->region?->name ?? 'Đặc sản' }}</span>
                 </div>
             </div>
 
@@ -145,7 +131,6 @@
         <div class="mb-10 flex gap-12 overflow-x-auto border-b border-outline-variant/15 scrollbar-none">
             @foreach([
                 'detail-info' => 'Thông tin chi tiết',
-                'detail-reviews' => 'Đánh giá khách hàng',
                 'detail-usage' => 'Hướng dẫn sử dụng',
             ] as $target => $label)
                 <button class="whitespace-nowrap pb-4 font-medium transition-colors {{ $loop->first ? 'border-b-2 border-primary font-bold text-primary' : 'text-on-surface-variant hover:text-primary' }}" type="button" data-tab-group="detail" data-tab-target="{{ $target }}" data-tab-active-class="border-b-2 border-primary font-bold text-primary" data-tab-inactive-class="text-on-surface-variant hover:text-primary">
@@ -157,35 +142,21 @@
         <div class="grid grid-cols-1 gap-16 lg:grid-cols-3">
             <div class="space-y-12 lg:col-span-2">
                 <div id="detail-info" data-tab-panel data-tab-group="detail" class="space-y-6">
-                    <h3 class="font-headline text-2xl font-bold tracking-tight">Câu chuyện nguồn gốc</h3>
-                    <p class="leading-relaxed text-on-surface-variant">{{ $product->description ?: $product->short_description }}</p>
+                    <h3 class="font-headline text-2xl font-bold tracking-tight">Thông tin sản phẩm</h3>
+                    <p class="leading-relaxed text-on-surface-variant">{{ $product->description ?: 'Đang cập nhật mô tả sản phẩm.' }}</p>
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div class="rounded-xl bg-surface-container-lowest p-6">
                             @include('user-web.partials.icon', ['name' => 'verified', 'class' => 'mb-3 text-tertiary'])
-                            <h4 class="mb-2 font-bold">Nguồn gốc</h4>
-                            <p class="text-sm text-on-surface-variant">{{ $product->origin ?: ($product->region?->name ?? 'Đang cập nhật') }}</p>
+                            <h4 class="mb-2 font-bold">Danh mục</h4>
+                            <p class="text-sm text-on-surface-variant">{{ $product->category?->name ?? 'Đang cập nhật' }}</p>
                         </div>
                         <div class="rounded-xl bg-surface-container-lowest p-6">
                             @include('user-web.partials.icon', ['name' => 'inventory_2', 'class' => 'mb-3 text-tertiary'])
-                            <h4 class="mb-2 font-bold">Đóng gói</h4>
-                            <p class="text-sm text-on-surface-variant">{{ $product->weight ?: 'Theo tiêu chuẩn Heritage Harvest' }} · {{ $product->shelf_life ?: 'Bảo quản nơi khô ráo' }}</p>
+                            <h4 class="mb-2 font-bold">Nhà cung cấp</h4>
+                            <p class="text-sm text-on-surface-variant">{{ $product->supplier?->name ?? $product->region?->name ?? 'Heritage Harvest' }}</p>
                         </div>
                     </div>
                 </div>
-
-                <div id="detail-reviews" data-tab-panel data-tab-group="detail" class="hidden space-y-6">
-                    <div class="flex flex-wrap items-end justify-between gap-4">
-                        <div>
-                            <h3 class="font-headline text-2xl font-bold tracking-tight">Đánh giá khách hàng</h3>
-                            <p class="text-on-surface-variant">Hiện chưa có đánh giá chi tiết từ khách hàng để hiển thị tại đây.</p>
-                        </div>
-                        <button class="cursor-not-allowed rounded-full bg-surface-container px-6 py-3 font-bold text-on-surface-variant" type="button" disabled>Sắp cập nhật</button>
-                    </div>
-                    <div class="rounded-2xl bg-surface-container-low p-6 text-sm leading-7 text-on-surface-variant">
-                        Khi có đánh giá khách hàng, tab này sẽ hiển thị phản hồi thật và cho phép khách hàng gửi nhận xét về sản phẩm.
-                    </div>
-                </div>
-
                 <div id="detail-usage" data-tab-panel data-tab-group="detail" class="hidden space-y-6">
                     <h3 class="font-headline text-2xl font-bold tracking-tight">Cách sử dụng sản phẩm</h3>
                     <div class="grid gap-4 sm:grid-cols-3">
@@ -207,19 +178,12 @@
                 <div class="space-y-6 rounded-2xl bg-surface-container-high p-8">
                     <h4 class="font-headline text-xl font-bold">Cam kết chất lượng</h4>
                     <ul class="space-y-4">
-                        @forelse($certifications as $certification)
+                        @foreach(['Nguồn gốc rõ ràng', 'Đóng gói đúng chuẩn', 'Hỗ trợ đổi trả theo chính sách'] as $commitment)
                             <li class="flex items-start gap-3">
                                 @include('user-web.partials.icon', ['name' => 'task_alt', 'class' => 'text-primary'])
-                                <span class="text-sm">{{ $certification }}</span>
+                                <span class="text-sm">{{ $commitment }}</span>
                             </li>
-                        @empty
-                            @foreach(['Nguồn gốc rõ ràng', 'Đóng gói đúng chuẩn', 'Hỗ trợ đổi trả theo chính sách'] as $commitment)
-                                <li class="flex items-start gap-3">
-                                    @include('user-web.partials.icon', ['name' => 'task_alt', 'class' => 'text-primary'])
-                                    <span class="text-sm">{{ $commitment }}</span>
-                                </li>
-                            @endforeach
-                        @endforelse
+                        @endforeach
                     </ul>
                 </div>
             </div>
@@ -238,8 +202,9 @@
                 <article class="group cursor-pointer">
                     <a href="{{ $ui->productUrl($relatedProduct) }}">
                         <div class="relative mb-4 aspect-[4/5] overflow-hidden rounded-xl bg-surface-container-lowest">
-                            @if($relatedProduct->image_url)
-                                <img class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" src="{{ $relatedProduct->image_url }}" alt="{{ $relatedProduct->name }}">
+                            @php($relatedImage = $relatedProduct->displayImageUrl() ?? collect($relatedProduct->galleryImageUrls())->first())
+                            @if($relatedImage)
+                                <img class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" src="{{ $relatedImage }}" alt="{{ $relatedProduct->name }}">
                             @else
                                 <div class="flex h-full w-full items-center justify-center text-primary">
                                     @include('user-web.partials.icon', ['name' => 'inventory_2', 'class' => 'text-5xl'])

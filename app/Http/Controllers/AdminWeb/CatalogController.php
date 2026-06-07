@@ -12,7 +12,9 @@ use App\Models\Region;
 use App\Models\Supplier;
 use App\Services\CategoryService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class CatalogController extends AdminWebController
 {
@@ -38,8 +40,6 @@ class CatalogController extends AdminWebController
                 'is_active' => true,
                 'stock_quantity' => 0,
                 'sale_price' => 0,
-                'certifications' => [],
-                'gallery' => [],
             ]),
             ...$this->productFormOptions(),
         ]);
@@ -47,19 +47,31 @@ class CatalogController extends AdminWebController
 
     public function productsStore(StoreProductRequest $request): RedirectResponse
     {
-        $data = $request->validated();
-        $data['is_active'] = $data['is_active'] ?? true;
-        $data['is_deleted'] = $data['is_deleted'] ?? false;
 
-        $product = Product::query()->create($data);
+        $galleryPaths = $this->storeUploadedImagePaths($request->file('images', []));
+        $thumbnailPath = $request->hasFile('image_url')
+            ? $request->file('image_url')->store('products', 'public')
+            : $galleryPaths->first();
 
-        return redirect()->to(
-            $this->adminUser()->hasAdminPermission('admin.products.update')
-                ? route('admin-web.products.edit', $product->id)
-                : ($this->adminUser()->hasAdminPermission('admin.products.view')
-                    ? route('admin-web.products.index')
-                    : route('admin-web.products.create'))
-        )
+        $product = Product::create([
+            'category_id' => $request->category_id,
+            'supplier_id' => $request->supplier_id,
+            'region_id' => $request->region_id,
+            'sku' => $request->sku,
+            'name' => $request->name,
+            'description' => $request->description,
+            'image_url' => $thumbnailPath,
+            'gallery' => $galleryPaths->implode('|'),
+            'sale_price' => $request->sale_price,
+            'stock_quantity' => $request->stock_quantity,
+            'is_active' => $request->is_active,
+            'is_deleted' => $request->is_deleted,
+        ]);
+        $product->update([
+            'slug' => Str::slug($product->name) . '-' . $product->id,
+
+        ]);
+        return redirect()->route('admin-web.products.index')
             ->with('status', 'Đã tạo sản phẩm thành công.');
     }
 
@@ -74,9 +86,26 @@ class CatalogController extends AdminWebController
     public function productsUpdate(UpdateProductRequest $request, int $id): RedirectResponse
     {
         $product = Product::query()->findOrFail($id);
-        $data = $request->validated();
+        $data = collect($request->validated())
+            ->except(['image_url', 'images', 'existing_gallery'])
+            ->all();
 
-        if (($data['is_active'] ?? false) === true && ! array_key_exists('is_deleted', $data)) {
+        $galleryPaths = $this->cleanGalleryPaths($request->input('existing_gallery', []))
+            ->merge($this->storeUploadedImagePaths($request->file('images', [])))
+            ->unique()
+            ->values();
+
+        if ($request->hasFile('image_url')) {
+            $data['image_url'] = $request->file('image_url')->store('products', 'public');
+        } elseif (is_string($request->input('image_url')) && trim((string) $request->input('image_url')) !== '') {
+            $data['image_url'] = trim((string) $request->input('image_url'));
+        } elseif (! $product->image_url && $galleryPaths->isNotEmpty()) {
+            $data['image_url'] = $galleryPaths->first();
+        }
+
+        $data['gallery'] = $galleryPaths->implode('|');
+
+        if (($data['is_active'] ?? false) === true && !array_key_exists('is_deleted', $data)) {
             $data['is_deleted'] = false;
         }
 
@@ -119,8 +148,8 @@ class CatalogController extends AdminWebController
 
         return redirect()->to(
             $this->adminUser()->hasAdminPermission('admin.categories.update')
-                ? route('admin-web.categories.edit', $category)
-                : route('admin-web.categories.index')
+            ? route('admin-web.categories.edit', $category)
+            : route('admin-web.categories.index')
         )
             ->with('status', 'Đã tạo danh mục thành công.');
     }
@@ -172,8 +201,8 @@ class CatalogController extends AdminWebController
 
         return redirect()->to(
             $this->adminUser()->hasAdminPermission('admin.suppliers.update')
-                ? route('admin-web.suppliers.edit', $supplier)
-                : route('admin-web.suppliers.index')
+            ? route('admin-web.suppliers.edit', $supplier)
+            : route('admin-web.suppliers.index')
         )
             ->with('status', 'Đã tạo nhà cung cấp thành công.');
     }
@@ -189,7 +218,7 @@ class CatalogController extends AdminWebController
     {
         $attributes = $request->validated();
 
-        if (($attributes['is_active'] ?? false) === true && ! array_key_exists('is_deleted', $attributes)) {
+        if (($attributes['is_active'] ?? false) === true && !array_key_exists('is_deleted', $attributes)) {
             $attributes['is_deleted'] = false;
         }
 
@@ -298,5 +327,21 @@ class CatalogController extends AdminWebController
             'suppliersForForm' => Supplier::query()->orderBy('name')->get(),
             'regionsForForm' => Region::query()->orderBy('name')->get(),
         ];
+    }
+
+    private function storeUploadedImagePaths(mixed $files)
+    {
+        return collect($files)
+            ->filter(fn (mixed $image): bool => $image instanceof UploadedFile)
+            ->map(fn ($image): string => $image->store('products', 'public'))
+            ->values();
+    }
+
+    private function cleanGalleryPaths(mixed $paths)
+    {
+        return collect(is_array($paths) ? $paths : [])
+            ->map(fn (mixed $path): string => trim((string) $path))
+            ->filter()
+            ->values();
     }
 }

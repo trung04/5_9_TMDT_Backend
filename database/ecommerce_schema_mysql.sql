@@ -270,13 +270,8 @@ CREATE TABLE IF NOT EXISTS `products` (
   `slug` VARCHAR(180) NULL,
   `name` VARCHAR(180) NOT NULL,
   `description` TEXT NULL,
-  `short_description` TEXT NULL,
   `image_url` TEXT NULL,
-  `origin` VARCHAR(180) NULL,
-  `weight` VARCHAR(80) NULL,
-  `shelf_life` VARCHAR(120) NULL,
-  `certifications` JSON NULL,
-  `gallery` JSON NULL,
+  `gallery` TEXT NULL,
   `sale_price` DECIMAL(15,2) NOT NULL,
   `stock_quantity` INT UNSIGNED NOT NULL DEFAULT 0,
   `is_active` BOOLEAN NOT NULL DEFAULT TRUE,
@@ -316,6 +311,22 @@ CREATE TABLE IF NOT EXISTS `prices` (
     FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `fk_prices_supplier`
     FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `product_images` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `product_id` BIGINT UNSIGNED NOT NULL,
+  `image_url` TEXT NOT NULL,
+  `path` VARCHAR(2048) NOT NULL,
+  `sort_order` INT UNSIGNED NOT NULL DEFAULT 0,
+  `is_primary` BOOLEAN NOT NULL DEFAULT FALSE,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_product_images_product_order` (`product_id`, `sort_order`),
+  KEY `idx_product_images_product_primary` (`product_id`, `is_primary`),
+  CONSTRAINT `fk_product_images_product`
+    FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `carts` (
